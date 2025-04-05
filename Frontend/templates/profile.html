@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - ShopEasy{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">My Profile</h1>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Account Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Name:</strong> {{ user.name }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Address:</strong> {{ user.address }}</p>
+                <a href="#" class="btn btn-outline-primary">Edit Profile</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Order History</h5>
+            </div>
+            <div class="card-body">
+                {% if orders %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Date</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr>
+                                <td>#{{ order.id }}</td>
+                                <td>{{ order.date }}</td>
+                                <td>${{ order.total }}</td>
+                                <td>
+                                    <span class="badge {% if order.status == 'Delivered' %}bg-success{% elif order.status == 'Processing' %}bg-warning{% else %}bg-info{% endif %}">
+                                        {{ order.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="#" class="btn btn-sm btn-outline-primary">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p>You haven't placed any orders yet.</p>
+                <a href="{{ url_for('products') }}" class="btn btn-primary">Start Shopping</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

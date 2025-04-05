@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="jumbotron bg-light p-5 rounded">
+    <h1 class="display-4">Welcome to ShopEasy</h1>
+    <p class="lead">Your ultimate destination for all your shopping needs.</p>
+    <hr class="my-4">
+    <p>Explore our vast collection of products with fast shipping and secure payments.</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('products') }}" role="button">Shop Now</a>
+</div>
+
+<div class="my-5">
+    <h2 class="text-center mb-4">Featured Products</h2>
+    <div class="row">
+        {% for product in featured_products %}
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-img-top bg-light text-center py-4">
+                    <svg width="100" height="100" fill="currentColor" class="text-secondary">
+                        <rect width="100" height="100" />
+                        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff">Product</text>
+                    </svg>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ product.name }}</h5>
+                    <p class="card-text text-primary fw-bold">${{ product.price }}</p>
+                    <p class="card-text">{{ product.description[:50] }}...</p>
+                    <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn btn-outline-primary">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="text-center mt-3">
+        <a href="{{ url_for('products') }}" class="btn btn-outline-secondary">View All Products</a>
+    </div>
+</div>
+
+<div class="row my-5">
+    <div class="col-md-4 mb-4">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-truck" style="font-size: 3rem;"></i>
+                <h5 class="card-title mt-3">Fast Shipping</h5>
+                <p class="card-text">Get your products delivered to your doorstep quickly and securely.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-shield-check" style="font-size: 3rem;"></i>
+                <h5 class="card-title mt-3">Secure Payments</h5>
+                <p class="card-text">Shop with confidence using our secure payment gateway.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-arrow-counterclockwise" style="font-size: 3rem;"></i>
+                <h5 class="card-title mt-3">Easy Returns</h5>
+                <p class="card-text">Not satisfied? Return your products with our hassle-free return policy.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

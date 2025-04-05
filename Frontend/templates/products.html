@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Products - ShopEasy{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Products</h1>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Categories</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <a href="{{ url_for('products') }}" class="list-group-item list-group-item-action {% if not request.args.get('category') %}active{% endif %}">
+                        All Categories
+                    </a>
+                    {% for category in categories %}
+                    <a href="{{ url_for('products', category=category) }}" class="list-group-item list-group-item-action {% if request.args.get('category') == category %}active{% endif %}">
+                        {{ category }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Filter by Price</h5>
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="mb-3">
+                        <label for="minPrice" class="form-label">Min Price:</label>
+                        <input type="number" class="form-control" id="minPrice" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label for="maxPrice" class="form-label">Max Price:</label>
+                        <input type="number" class="form-control" id="maxPrice" min="0">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Apply Filter</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-9">
+        {% if request.args.get('search') %}
+        <div class="alert alert-info">
+            Search results for: <strong>{{ request.args.get('search') }}</strong>
+        </div>
+        {% endif %}
+        
+        {% if request.args.get('category') %}
+        <div class="alert alert-info">
+            Category: <strong>{{ request.args.get('category') }}</strong>
+        </div>
+        {% endif %}
+        
+        {% if products %}
+        <div class="row">
+            {% for product in products %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-img-top bg-light text-center py-4">
+                        <svg width="100" height="100" fill="currentColor" class="text-secondary">
+                            <rect width="100" height="100" />
+                            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff">Product</text>
+                        </svg>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ product.name }}</h5>
+                        <p class="card-text text-primary fw-bold">${{ product.price }}</p>
+                        <p class="card-text">{{ product.description[:50] }}...</p>
+                        <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn btn-outline-primary">View Details</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+            No products found.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+/* Custom styles beyond Bootstrap */
+
+/* Product card hover effect */
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+/* Price text */
+.text-primary.fw-bold {
+    font-size: 1.25rem;
+}
+
+/* Custom header styling */
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+/* Footer styling */
+footer {
+    margin-top: 3rem;
+}
+
+/* Cart badge */
+.badge {
+    position: relative;
+    top: -1px;
+}
+
+/* Product image placeholder */
+.card-img-top {
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Button hover effects */
+.btn-primary {
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Form control focus */
+.form-control:focus {
+    border-color: #3f51b5;
+    box-shadow: 0 0 0 0.25rem rgba(63, 81, 181, 0.25);
+}
