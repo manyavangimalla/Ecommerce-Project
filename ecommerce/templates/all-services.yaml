@@ -17,6 +17,7 @@ data:
   USER_SERVICE_URL: "http://user-auth-service:8002"
   ORDER_SERVICE_URL: "http://order-payment-service:8003"
   NOTIFICATION_SERVICE_URL: "http://notification-service:8004"
+  DEPLOY_ENV: "local" # Toggle between 'local' and 'cloud'
 ---
 apiVersion: v1
 kind: Secret
@@ -47,7 +48,13 @@ spec:
     spec:
       containers:
       - name: user-auth-service
-        image: gcr.io/ecommerceproject-455902/user_auth_service:latest
+        image: user_auth_service:local # Use local image for local deployment
+        env:
+        - name: DEPLOY_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ecommerce-config
+              key: DEPLOY_ENV
         ports:
         - containerPort: 8002
 ---
@@ -82,7 +89,13 @@ spec:
     spec:
       containers:
       - name: product-inventory-service
-        image: gcr.io/ecommerceproject-455902/product_inventory_service:latest
+        image: product_inventory_service:local # Use local image for local deployment
+        env:
+        - name: DEPLOY_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ecommerce-config
+              key: DEPLOY_ENV
         ports:
         - containerPort: 8001
 ---
@@ -117,7 +130,13 @@ spec:
     spec:
       containers:
       - name: order-payment-service
-        image: gcr.io/ecommerceproject-455902/order_payment_service:latest
+        image: order_payment_service:local # Use local image for local deployment
+        env:
+        - name: DEPLOY_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ecommerce-config
+              key: DEPLOY_ENV
         ports:
         - containerPort: 8003
 ---
@@ -152,7 +171,13 @@ spec:
     spec:
       containers:
       - name: notification-service
-        image: gcr.io/ecommerceproject-455902/notification_service:latest
+        image: notification_service:local # Use local image for local deployment
+        env:
+        - name: DEPLOY_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ecommerce-config
+              key: DEPLOY_ENV
         ports:
         - containerPort: 8004
 ---
@@ -187,7 +212,13 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: gcr.io/ecommerceproject-455902/api_gateway:latest
+        image: api_gateway:local # Use local image for local deployment
+        env:
+        - name: DEPLOY_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ecommerce-config
+              key: DEPLOY_ENV
         ports:
         - containerPort: 8000
 ---
@@ -222,7 +253,13 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: gcr.io/ecommerceproject-455902/Frontend:latest
+        image: frontend:local # Use local image for local deployment
+        env:
+        - name: DEPLOY_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ecommerce-config
+              key: DEPLOY_ENV
         ports:
         - containerPort: 80
 ---
@@ -246,7 +283,7 @@ metadata:
   name: ecommerce-ingress
   namespace: ecommerce
   annotations:
-    spec.ingressClassName: "gce"
+    spec.ingressClassName: "nginx" # Use NGINX ingress for local deployment
 spec:
   rules:
   - http:
