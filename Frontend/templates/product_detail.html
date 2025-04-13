@@ -6,10 +6,10 @@
 <div class="row">
     <div class="col-md-6">
         <div class="bg-light p-5 text-center rounded">
-            <svg width="300" height="300" fill="currentColor" class="text-secondary">
-                <rect width="300" height="300" />
-                <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff">Product Image</text>
-            </svg>
+            <img src="{{ url_for('static', filename='images/' + product.image) }}"
+                 alt="{{ product.name }}"
+                 class="img-fluid rounded"
+                 style="max-height: 300px;" />
         </div>
     </div>
     <div class="col-md-6">
@@ -58,25 +58,21 @@
 <div class="row mt-5">
     <div class="col-12">
         <h3>Related Products</h3>
-        <div class="row">
-            {% for i in range(1, 5) %}
-            <div class="col-md-3 mb-4">
-                <div class="card h-100">
-                    <div class="card-img-top bg-light text-center py-4">
-                        <svg width="100" height="100" fill="currentColor" class="text-secondary">
-                            <rect width="100" height="100" />
-                            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff">Product</text>
-                        </svg>
-                    </div>
-                    <div class="card-body">
-                        <h5 class="card-title">Related Product {{ i }}</h5>
-                        <p class="card-text text-primary fw-bold">$99.99</p>
-                        <a href="#" class="btn btn-outline-primary">View Details</a>
-                    </div>
+        <div class="d-flex flex-row overflow-auto">
+            {% for i in range(1, 6) %}
+            <div class="card me-3" style="width: 250px; flex: 0 0 auto;">
+                <img src="{{ url_for('static', filename='images/' ~ product.image) }}"
+                    alt="{{ product.name }}"
+                    class="card-img-top"
+                    style="height: 200px; object-fit: cover;" />
+                <div class="card-body">
+                    <h5 class="card-title">Related Product {{ i }}</h5>
+                    <p class="card-text text-primary fw-bold">$199.99</p>
+                    <a href="#" class="btn btn-outline-primary">View Details</a>
                 </div>
-            </div>
-            {% endfor %}
-        </div>
+       </div>
+        {% endfor %}
+        
     </div>
 </div>
 {% endblock %}

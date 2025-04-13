@@ -1,5 +1,14 @@
 /* Custom styles beyond Bootstrap */
 
+.custom-navbar {
+    background-color: #000000 !important;
+}
+.custom-navbar .nav-link,
+.custom-navbar .navbar-brand,
+.custom-navbar .navbar-text {
+    color: #ffffff !important;
+}
+
 /* Product card hover effect */
 .card {
     transition: all 0.3s ease;
@@ -15,10 +24,13 @@
     font-size: 1.25rem;
 }
 
+
 /* Custom header styling */
 .navbar-brand {
     font-weight: bold;
     font-size: 1.5rem;
+    color: black;
+
 }
 
 /* Footer styling */
@@ -52,6 +64,6 @@ footer {
 
 /* Form control focus */
 .form-control:focus {
-    border-color: #3f51b5;
+    border-color: black;
     box-shadow: 0 0 0 0.25rem rgba(63, 81, 181, 0.25);
 }

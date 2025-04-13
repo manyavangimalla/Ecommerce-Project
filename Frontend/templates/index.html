@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="jumbotron bg-light p-5 rounded">
-    <h1 class="display-4">Welcome to ShopEasy</h1>
+    <h1 class="display-4">Welcome to ElectroCart</h1>
     <p class="lead">Your ultimate destination for all your shopping needs.</p>
     <hr class="my-4">
     <p>Explore our vast collection of products with fast shipping and secure payments.</p>
@@ -16,10 +16,10 @@
         <div class="col-md-3 mb-4">
             <div class="card h-100">
                 <div class="card-img-top bg-light text-center py-4">
-                    <svg width="100" height="100" fill="currentColor" class="text-secondary">
-                        <rect width="100" height="100" />
-                        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff">Product</text>
-                    </svg>
+                    <img src="{{ url_for('static', filename='images/' ~ product.image) }}"
+                        alt="{{ product.name }}"
+                        class="card-img-top"
+                        style="height: 200px; object-fit: cover;" />
                 </div>
                 <div class="card-body">
                     <h5 class="card-title">{{ product.name }}</h5>

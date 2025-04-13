@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Products - ShopEasy{% endblock %}
+{% block title %}Products - ElectroCart{% endblock %}
 
 {% block content %}
 <h1 class="mb-4">Products</h1>
@@ -63,12 +63,10 @@
             {% for product in products %}
             <div class="col-md-4 mb-4">
                 <div class="card h-100">
-                    <div class="card-img-top bg-light text-center py-4">
-                        <svg width="100" height="100" fill="currentColor" class="text-secondary">
-                            <rect width="100" height="100" />
-                            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff">Product</text>
-                        </svg>
-                    </div>
+                    <img src="{{ url_for('static', filename='images/' ~ product.image) }}"
+                        alt="{{ product.name }}"
+                        class="card-img-top"
+                        style="height: 200px; object-fit: cover;" />
                     <div class="card-body">
                         <h5 class="card-title">{{ product.name }}</h5>
                         <p class="card-text text-primary fw-bold">${{ product.price }}</p>
