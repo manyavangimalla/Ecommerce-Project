@@ -9,24 +9,27 @@ if [ -z "$DEPLOY_ENV" ]; then
   exit 1
 fi
 
-# Step 0: Ensure namespace exists
+# Step 0: Ensure namespace exists and is properly labeled/annotated
 ensure_namespace() {
-  echo "Ensuring namespace exists..."
+  echo "Ensuring namespace exists and is properly configured..."
   if ! kubectl get namespace ecommerce > /dev/null 2>&1; then
     echo "Namespace 'ecommerce' not found. Creating it..."
     kubectl create namespace ecommerce
   else
-    echo "Namespace 'ecommerce' already exists."
+    echo "Namespace 'ecommerce' already exists. Ensuring proper labels and annotations..."
+    kubectl label namespace ecommerce app.kubernetes.io/managed-by=Helm --overwrite
+    kubectl annotate namespace ecommerce meta.helm.sh/release-name=ecommerce --overwrite
+    kubectl annotate namespace ecommerce meta.helm.sh/release-namespace=ecommerce --overwrite
   fi
 }
 
 # Step 1: Build Docker images
 build_images() {
   echo "Building Docker images..."
-  services=("user_auth_service" "notification_service" "product_inventory_service" "order_payment_service" "api_gateway" "Frontend")
+  services=("user_auth_service" "notification_service" "product_inventory_service" "order_payment_service" "api_gateway" "frontend")
   for service in "${services[@]}"; do
     echo "Building $service..."
-    docker build -t "$service:local" ./$service
+    docker build -t "${service,,}:local" ./$service
   done
 }
 
@@ -61,13 +64,24 @@ deploy_with_helm() {
   fi
 }
 
-# Step 4: Update ConfigMap for deployment environment
+# Step 4: Update or create ConfigMap for deployment environment
 update_configmap() {
-  echo "Updating ConfigMap for deployment environment..."
-  kubectl patch configmap ecommerce-config \
-    --namespace ecommerce \
-    --type merge \
-    --patch "{\"data\":{\"DEPLOY_ENV\":\"$DEPLOY_ENV\"}}"
+  echo "Ensuring ConfigMap exists and is updated for deployment environment..."
+  if ! kubectl get configmap ecommerce-config --namespace ecommerce > /dev/null 2>&1; then
+    echo "ConfigMap 'ecommerce-config' not found. Creating it..."
+    kubectl create configmap ecommerce-config \
+      --namespace ecommerce \
+      --from-literal=DEPLOY_ENV="$DEPLOY_ENV"
+  else
+    echo "Updating existing ConfigMap 'ecommerce-config'..."
+    kubectl label configmap ecommerce-config app.kubernetes.io/managed-by=Helm --namespace ecommerce --overwrite
+    kubectl annotate configmap ecommerce-config meta.helm.sh/release-name=ecommerce --namespace ecommerce --overwrite
+    kubectl annotate configmap ecommerce-config meta.helm.sh/release-namespace=ecommerce --namespace ecommerce --overwrite
+    kubectl patch configmap ecommerce-config \
+      --namespace ecommerce \
+      --type merge \
+      --patch "{\"data\":{\"DEPLOY_ENV\":\"$DEPLOY_ENV\"}}"
+  fi
 }
 
 # Main script execution
