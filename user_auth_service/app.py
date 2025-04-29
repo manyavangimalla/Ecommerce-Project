@@ -8,7 +8,10 @@ from flask_bcrypt import Bcrypt
 from functools import wraps
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/user_db')
+
+# Update database connection to use the shared database
+DATABASE_URL = "postgresql://ecommerce_user:password@ecommerce-db:5432/ecommerce_db"
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', DATABASE_URL)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev_secret_key')
 

@@ -23,6 +23,14 @@ ensure_namespace() {
   fi
 }
 
+# Step 0.5: Configure Minikube's Docker environment (for local deployment)
+configure_minikube_docker() {
+  if [ "$DEPLOY_ENV" == "local" ]; then
+    echo "Configuring Minikube's Docker environment..."
+    eval $(minikube docker-env)
+  fi
+}
+
 # Step 1: Build Docker images
 build_images() {
   echo "Building Docker images..."
@@ -92,6 +100,7 @@ if [ "$1" == "build" ]; then
     exit 1
   fi
   ensure_namespace
+  configure_minikube_docker  # Ensure Minikube's Docker is used for local builds
   build_images
   if [ "$DEPLOY_ENV" == "cloud" ]; then
     push_images

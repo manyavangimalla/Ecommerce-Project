@@ -37,7 +37,7 @@ metadata:
   name: user-auth-service
   namespace: ecommerce
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: user-auth-service
@@ -45,6 +45,7 @@ spec:
     metadata:
       labels:
         app: user-auth-service
+      namespace: ecommerce
     spec:
       containers:
       - name: user-auth-service
@@ -78,7 +79,7 @@ metadata:
   name: product-inventory-service
   namespace: ecommerce
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: product-inventory-service
@@ -86,6 +87,7 @@ spec:
     metadata:
       labels:
         app: product-inventory-service
+      namespace: ecommerce
     spec:
       containers:
       - name: product-inventory-service
@@ -119,7 +121,7 @@ metadata:
   name: order-payment-service
   namespace: ecommerce
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: order-payment-service
@@ -127,6 +129,7 @@ spec:
     metadata:
       labels:
         app: order-payment-service
+      namespace: ecommerce
     spec:
       containers:
       - name: order-payment-service
@@ -160,7 +163,7 @@ metadata:
   name: notification-service
   namespace: ecommerce
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: notification-service
@@ -168,6 +171,7 @@ spec:
     metadata:
       labels:
         app: notification-service
+      namespace: ecommerce
     spec:
       containers:
       - name: notification-service
@@ -201,7 +205,7 @@ metadata:
   name: api-gateway
   namespace: ecommerce
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: api-gateway
@@ -209,6 +213,7 @@ spec:
     metadata:
       labels:
         app: api-gateway
+      namespace: ecommerce
     spec:
       containers:
       - name: api-gateway
@@ -242,7 +247,7 @@ metadata:
   name: frontend
   namespace: ecommerce
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: frontend
@@ -250,6 +255,7 @@ spec:
     metadata:
       labels:
         app: frontend
+      namespace: ecommerce
     spec:
       containers:
       - name: frontend
@@ -302,3 +308,60 @@ spec:
             name: frontend
             port:
               number: 80
+---
+# Added StatefulSet and Service for the shared database
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ecommerce-db
+  namespace: ecommerce
+spec:
+  serviceName: ecommerce-db
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ecommerce-db
+  template:
+    metadata:
+      labels:
+        app: ecommerce-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: ecommerce_user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: DB_PASSWORD
+        - name: POSTGRES_DB
+          value: ecommerce_db
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-db
+  namespace: ecommerce
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None
+  selector:
+    app: ecommerce-db
