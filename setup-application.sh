@@ -12,15 +12,14 @@ fi
 # Step 0: Ensure namespace exists and is properly labeled/annotated
 ensure_namespace() {
   echo "Ensuring namespace exists and is properly configured..."
-  if ! kubectl get namespace ecommerce > /dev/null 2>&1; then
-    echo "Namespace 'ecommerce' not found. Creating it..."
-    kubectl create namespace ecommerce
-  else
-    echo "Namespace 'ecommerce' already exists. Ensuring proper labels and annotations..."
-    kubectl label namespace ecommerce app.kubernetes.io/managed-by=Helm --overwrite
-    kubectl annotate namespace ecommerce meta.helm.sh/release-name=ecommerce --overwrite
-    kubectl annotate namespace ecommerce meta.helm.sh/release-namespace=ecommerce --overwrite
-  fi
+  
+  echo "Namespace 'ecommerce' not found. Creating it..."
+  kubectl create namespace ecommerce
+  
+  echo "Namespace 'ecommerce' already exists. Ensuring proper labels and annotations..."
+  kubectl label namespace ecommerce app.kubernetes.io/managed-by=Helm --overwrite
+  kubectl annotate namespace ecommerce meta.helm.sh/release-name=ecommerce --overwrite
+  kubectl annotate namespace ecommerce meta.helm.sh/release-namespace=ecommerce --overwrite
 }
 
 # Step 0.5: Configure Minikube's Docker environment (for local deployment)
@@ -75,12 +74,11 @@ deploy_with_helm() {
 # Step 4: Update or create ConfigMap for deployment environment
 update_configmap() {
   echo "Ensuring ConfigMap exists and is updated for deployment environment..."
-  if ! kubectl get configmap ecommerce-config --namespace ecommerce > /dev/null 2>&1; then
-    echo "ConfigMap 'ecommerce-config' not found. Creating it..."
-    kubectl create configmap ecommerce-config \
+  
+  kubectl create configmap ecommerce-config \
       --namespace ecommerce \
       --from-literal=DEPLOY_ENV="$DEPLOY_ENV"
-  else
+  
     echo "Updating existing ConfigMap 'ecommerce-config'..."
     kubectl label configmap ecommerce-config app.kubernetes.io/managed-by=Helm --namespace ecommerce --overwrite
     kubectl annotate configmap ecommerce-config meta.helm.sh/release-name=ecommerce --namespace ecommerce --overwrite
@@ -89,7 +87,6 @@ update_configmap() {
       --namespace ecommerce \
       --type merge \
       --patch "{\"data\":{\"DEPLOY_ENV\":\"$DEPLOY_ENV\"}}"
-  fi
 }
 
 # Main script execution

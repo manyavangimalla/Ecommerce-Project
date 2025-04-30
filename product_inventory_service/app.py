@@ -10,11 +10,21 @@ import redis
 
 app = Flask(__name__)
 
-# Update database connection to use the shared database
-DATABASE_URL = "postgresql://ecommerce_user:password@ecommerce-db:5432/ecommerce_db"
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', DATABASE_URL)
+# Get individual database credentials from environment variables
+db_user = os.environ.get('DB_USER')
+db_password = os.environ.get('DB_PASSWORD')
+db_host = os.environ.get('DB_HOST')
+db_port = os.environ.get('DB_PORT')
+db_name = os.environ.get('DB_NAME')
+
+# Construct the database URL from individual components
+DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+print(f"Connecting to database at {DATABASE_URL.replace(db_password, '******')}")  # Log the URL without exposing password
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev_secret_key')
+# Get JWT secret key from environment
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET', 'dev_secret_key')
 
 db = SQLAlchemy(app)
 
@@ -386,6 +396,8 @@ def health_check():
     return jsonify({'status': 'healthy'}), 200
 
 if __name__ == '__main__':
+    print("\n\n\nShubhammm \n\n\n")
+    print(f"\n\nConnecting to database at {DATABASE_URL}")
     with app.app_context():
         db.create_all()
         

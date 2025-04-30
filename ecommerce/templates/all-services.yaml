@@ -56,6 +56,24 @@ spec:
             configMapKeyRef:
               name: ecommerce-config
               key: DEPLOY_ENV
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.passwordSecret }}
+              key: {{ .Values.database.passwordKey }}
+        - name: DB_USER
+          value: "{{ .Values.database.user }}"
+        - name: DB_HOST
+          value: "{{ .Values.database.host }}"
+        - name: DB_PORT
+          value: "{{ .Values.database.port }}"
+        - name: DB_NAME
+          value: "{{ .Values.database.name }}"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: JWT_SECRET
         ports:
         - containerPort: 8002
 ---
@@ -98,6 +116,24 @@ spec:
             configMapKeyRef:
               name: ecommerce-config
               key: DEPLOY_ENV
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.passwordSecret }}
+              key: {{ .Values.database.passwordKey }}
+        - name: DB_USER
+          value: "{{ .Values.database.user }}"
+        - name: DB_HOST
+          value: "{{ .Values.database.host }}"
+        - name: DB_PORT
+          value: "{{ .Values.database.port }}"
+        - name: DB_NAME
+          value: "{{ .Values.database.name }}"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: JWT_SECRET
         ports:
         - containerPort: 8001
 ---
@@ -140,6 +176,24 @@ spec:
             configMapKeyRef:
               name: ecommerce-config
               key: DEPLOY_ENV
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.passwordSecret }}
+              key: {{ .Values.database.passwordKey }}
+        - name: DB_USER
+          value: "{{ .Values.database.user }}"
+        - name: DB_HOST
+          value: "{{ .Values.database.host }}"
+        - name: DB_PORT
+          value: "{{ .Values.database.port }}"
+        - name: DB_NAME
+          value: "{{ .Values.database.name }}"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: JWT_SECRET
         ports:
         - containerPort: 8003
 ---
@@ -182,6 +236,24 @@ spec:
             configMapKeyRef:
               name: ecommerce-config
               key: DEPLOY_ENV
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.passwordSecret }}
+              key: {{ .Values.database.passwordKey }}
+        - name: DB_USER
+          value: "{{ .Values.database.user }}"
+        - name: DB_HOST
+          value: "{{ .Values.database.host }}"
+        - name: DB_PORT
+          value: "{{ .Values.database.port }}"
+        - name: DB_NAME
+          value: "{{ .Values.database.name }}"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: JWT_SECRET
         ports:
         - containerPort: 8004
 ---
@@ -224,6 +296,24 @@ spec:
             configMapKeyRef:
               name: ecommerce-config
               key: DEPLOY_ENV
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.passwordSecret }}
+              key: {{ .Values.database.passwordKey }}
+        - name: DB_USER
+          value: "{{ .Values.database.user }}"
+        - name: DB_HOST
+          value: "{{ .Values.database.host }}"
+        - name: DB_PORT
+          value: "{{ .Values.database.port }}"
+        - name: DB_NAME
+          value: "{{ .Values.database.name }}"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: JWT_SECRET
         ports:
         - containerPort: 8000
 ---
@@ -266,8 +356,26 @@ spec:
             configMapKeyRef:
               name: ecommerce-config
               key: DEPLOY_ENV
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.passwordSecret }}
+              key: {{ .Values.database.passwordKey }}
+        - name: DB_USER
+          value: "{{ .Values.database.user }}"
+        - name: DB_HOST
+          value: "{{ .Values.database.host }}"
+        - name: DB_PORT
+          value: "{{ .Values.database.port }}"
+        - name: DB_NAME
+          value: "{{ .Values.database.name }}"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: JWT_SECRET
         ports:
-        - containerPort: 80
+        - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -279,7 +387,7 @@ spec:
     app: frontend
   ports:
   - port: 80
-    targetPort: 80
+    targetPort: 8080
   type: ClusterIP
 ---
 # Ingress

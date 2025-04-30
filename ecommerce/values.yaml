@@ -127,3 +127,12 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Database configuration for all services
+database:
+  host: "ecommerce-db"
+  port: 5432
+  name: "ecommerce_db"
+  user: "ecommerce_user"
+  passwordSecret: "ecommerce-secrets"
+  passwordKey: "DB_PASSWORD"
