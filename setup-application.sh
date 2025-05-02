@@ -1,13 +1,29 @@
 #!/bin/bash
 
 # This script sets up the entire application for local or cloud deployment.
-# Usage: ./setup-application.sh <build|deploy> <local|cloud>
+# Usage: ./setup-application.sh <build|deploy> <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]
 
 DEPLOY_ENV=$2
 if [ -z "$DEPLOY_ENV" ]; then
-  echo "Usage: $0 <build|deploy> <local|cloud>"
+  echo "Usage: $0 <build|deploy> <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]"
   exit 1
 fi
+
+# Check for force rebuild flag
+FORCE_REBUILD=false
+if [[ "$@" =~ "--force-rebuild" ]]; then
+  FORCE_REBUILD=true
+fi
+
+# Parse arguments for specific flags
+SERVICES=()
+for arg in "$@"; do
+  case $arg in
+    --services=*)
+      IFS=',' read -r -a SERVICES <<< "${arg#*=}"
+      ;;
+  esac
+done
 
 # Step 0: Ensure namespace exists and is properly labeled/annotated
 ensure_namespace() {
@@ -34,9 +50,19 @@ configure_minikube_docker() {
 build_images() {
   echo "Building Docker images..."
   services=("user_auth_service" "notification_service" "product_inventory_service" "order_payment_service" "api_gateway" "frontend")
+
+  # Use the services specified by the --services flag, if provided
+  if [ "${#SERVICES[@]}" -gt 0 ]; then
+    services=("${SERVICES[@]}")
+  fi
+
   for service in "${services[@]}"; do
     echo "Building $service..."
-    docker build -t "${service,,}:local" ./$service
+    if [ "$FORCE_REBUILD" = true ]; then
+      docker build --no-cache -t "${service,,}:local" ./$service
+    else
+      docker build -t "${service,,}:local" ./$service
+    fi
   done
 }
 
@@ -93,7 +119,7 @@ update_configmap() {
 if [ "$1" == "build" ]; then
   DEPLOY_ENV=$2
   if [ -z "$DEPLOY_ENV" ]; then
-    echo "Usage: $0 build <local|cloud>"
+    echo "Usage: $0 build <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]"
     exit 1
   fi
   ensure_namespace
@@ -105,14 +131,14 @@ if [ "$1" == "build" ]; then
 elif [ "$1" == "deploy" ]; then
   DEPLOY_ENV=$2
   if [ -z "$DEPLOY_ENV" ]; then
-    echo "Usage: $0 deploy <local|cloud>"
+    echo "Usage: $0 deploy <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]"
     exit 1
   fi
   ensure_namespace
   update_configmap
   deploy_with_helm
 else
-  echo "Invalid command. Usage: $0 <build|deploy> <local|cloud>"
+  echo "Invalid command. Usage: $0 <build|deploy> <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]"
   exit 1
 fi
 

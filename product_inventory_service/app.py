@@ -17,7 +17,7 @@ db_host = os.environ.get('DB_HOST')
 db_port = os.environ.get('DB_PORT')
 db_name = os.environ.get('DB_NAME')
 
-# Construct the database URL from individual components
+# Use Kubernetes DNS for service discovery
 DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 print(f"Connecting to database at {DATABASE_URL.replace(db_password, '******')}")  # Log the URL without exposing password
 
@@ -35,6 +35,14 @@ redis_client = redis.Redis(
     db=0,
     decode_responses=True
 )
+
+# Middleware to log all incoming requests
+@app.before_request
+def log_request():
+    print(f"Incoming request: {request.method} {request.url}")
+    print(f"Headers: {dict(request.headers)}")
+    if request.data:
+        print(f"Body: {request.data.decode('utf-8')}")
 
 # Models
 class Category(db.Model):

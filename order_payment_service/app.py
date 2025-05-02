@@ -7,6 +7,7 @@ import requests
 import jwt
 from functools import wraps
 import json
+from confluent_kafka import Producer
 
 app = Flask(__name__)
 
@@ -26,10 +27,27 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET')
 
 # Microservice URLs
-PRODUCT_SERVICE_URL = os.environ.get('PRODUCT_SERVICE_URL', 'http://localhost:5002')
-NOTIFICATION_SERVICE_URL = os.environ.get('NOTIFICATION_SERVICE_URL', 'http://localhost:5004')
+PRODUCT_SERVICE_URL = os.environ.get('PRODUCT_SERVICE_URL', 'http://product-inventory-service.ecommerce.svc.cluster.local')
+NOTIFICATION_SERVICE_URL = os.environ.get('NOTIFICATION_SERVICE_URL', 'http://notification-service.ecommerce.svc.cluster.local')
 
 db = SQLAlchemy(app)
+
+# Kafka producer configuration
+kafka_producer = Producer({'bootstrap.servers': 'kafka:9092'})
+
+def delivery_report(err, msg):
+    if err is not None:
+        print(f"Delivery failed for record {msg.key()}: {err}")
+    else:
+        print(f"Record successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
+
+# Middleware to log all incoming requests
+@app.before_request
+def log_request():
+    print(f"Incoming request: {request.method} {request.url}")
+    print(f"Headers: {dict(request.headers)}")
+    if request.data:
+        print(f"Body: {request.data.decode('utf-8')}")
 
 # Models
 class Order(db.Model):
@@ -124,7 +142,7 @@ def token_required(f):
 def send_notification(user_id, notification_type, data):
     try:
         response = requests.post(
-            f"{NOTIFICATION_SERVICE_URL}/api/notifications",
+            f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/notifications",
             json={
                 'user_id': user_id,
                 'type': notification_type,
@@ -148,7 +166,7 @@ def create_order(current_user_id):
     items_to_check = [{'product_id': item['product_id'], 'quantity': item['quantity']} for item in data['items']]
     try:
         inventory_response = requests.post(
-            f"{PRODUCT_SERVICE_URL}/api/inventory/check",
+            f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/inventory/check",
             json={'items': items_to_check}
         )
         inventory_data = inventory_response.json()
@@ -205,7 +223,7 @@ def create_order(current_user_id):
         # Update inventory
         try:
             requests.post(
-                f"{PRODUCT_SERVICE_URL}/api/inventory/update",
+                f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/inventory/update",
                 headers={'Authorization': request.headers.get('Authorization')},
                 json={'items': [{'product_id': item['product_id'], 'quantity': item['quantity'], 'operation': 'decrease'} for item in data['items']]}
             )
@@ -228,6 +246,21 @@ def create_order(current_user_id):
         new_order.status = 'cancelled'
     
     db.session.commit()
+    
+    # Publish order_created event to Kafka
+    order_event = {
+        'event_type': 'order_created',
+        'order_id': new_order.id,
+        'user_id': current_user_id,
+        'items': [{'product_id': item.product_id, 'quantity': item.quantity} for item in new_order.items]
+    }
+    kafka_producer.produce(
+        'order_created',
+        key=str(new_order.id),
+        value=json.dumps(order_event),
+        callback=delivery_report
+    )
+    kafka_producer.flush()
     
     return jsonify({
         'order': new_order.to_dict(),
@@ -287,7 +320,7 @@ def cancel_order(current_user_id, order_id):
     # Restore inventory
     try:
         requests.post(
-            f"{PRODUCT_SERVICE_URL}/api/inventory/update",
+            f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/inventory/update",
             headers={'Authorization': request.headers.get('Authorization')},
             json={'items': [{'product_id': item.product_id, 'quantity': item.quantity, 'operation': 'increase'} for item in order.items]}
         )

@@ -5,6 +5,14 @@ import json
 
 app = Flask(__name__)
 
+# Middleware to log all incoming requests
+@app.before_request
+def log_request():
+    print(f"Incoming request: {request.method} {request.url}", flush=True)
+    print(f"Headers: {dict(request.headers)}")
+    if request.data:
+        print(f"Body: {request.data.decode('utf-8')}")
+
 # Service URLs
 USER_SERVICE_URL = os.environ.get('USER_SERVICE_URL', 'http://localhost:5001')
 PRODUCT_SERVICE_URL = os.environ.get('PRODUCT_SERVICE_URL', 'http://localhost:5002')

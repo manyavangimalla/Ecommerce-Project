@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENV API_URL=http://api_gateway:5000
+ENV API_URL=http://api-gateway.ecommerce.svc.cluster.local
 
 EXPOSE 8080
 

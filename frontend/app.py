@@ -7,6 +7,18 @@ from functools import wraps
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
+# Middleware to log all incoming requests
+@app.before_request
+def log_request():
+    print(f"Incoming request: {request.method} {request.url}")
+    print(f"Headers: {dict(request.headers)}")
+    if request.data:
+        print(f"Body: {request.data.decode('utf-8')}")
+
+@app.context_processor
+def inject_api_url():
+    return {'API_URL': os.environ.get('API_URL', 'http://localhost:5000')}
+
 # Mock data - In production this would come from your microservices
 PRODUCTS = [
     {"id": 1, "name": "Wireless Headphones", "price": 129.99, "description": "High-quality wireless headphones with noise cancellation", "stock": 50, "category": "Electronics"},
@@ -105,36 +117,97 @@ def checkout():
 @app.route('/place_order', methods=['POST'])
 @login_required
 def place_order():
-    # This would interact with your Order & Payment Service
-    # For now, just clear the cart and show success
-    session['cart'] = []
-    flash('Order placed successfully!', 'success')
-    return redirect(url_for('index'))
+    try:
+        # Collect cart items from the session
+        cart_items = session.get('cart', [])
+        if not cart_items:
+            flash('Your cart is empty. Please add items before placing an order.', 'warning')
+            return redirect(url_for('cart'))
+
+        # Prepare order data
+        order_data = {
+            'items': [{'product_id': item_id} for item_id in cart_items],
+            'shipping_address': request.form.get('shipping_address'),
+            'payment_method': request.form.get('payment_method')
+        }
+
+        # Send order data to the Order Payment Service via the API Gateway
+        response = requests.post(
+            f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/orders",
+            json=order_data,
+            headers={'Authorization': f"Bearer {session.get('user_token')}"}
+        )
+
+        if response.status_code == 201:
+            session['cart'] = []  # Clear the cart after successful order placement
+            flash('Order placed successfully!', 'success')
+            return redirect(url_for('index'))
+        else:
+            error_message = response.json().get('message', 'Failed to place order. Please try again.')
+            flash(error_message, 'error')
+    except requests.exceptions.RequestException as e:
+        flash('An error occurred while connecting to the server. Please try again later.', 'error')
+
+    return redirect(url_for('cart'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        
-        # In production, validate against User & Auth Service
-        if email == 'user@example.com' and password == 'password':
-            session['user_id'] = 1
-            session['user_email'] = email
-            flash('Logged in successfully', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid credentials', 'error')
-    
+        # Collect form data
+        login_data = {
+            'email': request.form.get('email'),
+            'password': request.form.get('password')
+        }
+
+        # Send data to the User Auth Service via the API Gateway
+        try:
+            response = requests.post(f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/auth/login", json=login_data)
+            if response.status_code == 200:
+                user_data = response.json()
+                session['user_id'] = user_data['user']['id']
+                session['user_email'] = user_data['user']['email']
+                session['user_token'] = user_data['token']
+                flash('Logged in successfully', 'success')
+                return redirect(url_for('index'))
+            else:
+                error_message = response.json().get('message', 'Login failed. Please try again.')
+                flash(error_message, 'error')
+        except requests.exceptions.RequestException as e:
+            flash('An error occurred while connecting to the server. Please try again later.', 'error')
+
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        # This would interact with your User & Auth Service
-        flash('Registration successful! Please log in.', 'success')
-        return redirect(url_for('login'))
-    
+        # Collect form data
+        user_data = {
+            'first_name': request.form.get('firstName'),
+            'last_name': request.form.get('lastName'),
+            'email': request.form.get('email'),
+            'password': request.form.get('password')
+        }
+
+        print("\n\n\nShubham Register endpoint hit 222")
+        
+
+        # Send data to the User Auth Service via the API Gateway
+        try:
+            print("\n\n\nShubham Register endpoint hit 333", flush=True)
+            print(f'API_URL: {os.environ.get("API_URL", "http://localhost:5000")}', flush=True)
+            response = requests.post("http://localhost:5000/api/auth/register", json=user_data)
+            print("\n\n\nShubham Register endpoint hit 444", flush=True)
+            if response.status_code == 201:
+                flash('Registration successful! Please log in.', 'success')
+                return redirect(url_for('login'))
+            else:
+                error_message = response.json().get('message', 'Registration failed. Please try again.')
+                print(f"\n\nShubham Error during registration: {error_message}", flush=True)
+                flash(error_message, 'error')
+        except requests.exceptions.RequestException as e:
+            print(f"\n\nShubham Error during registration: {str(e)}", flush=True)
+            flash('An error occurred while connecting to the server. Please try again later.', 'error')
+
     return render_template('register.html')
 
 @app.route('/logout')
@@ -146,21 +219,22 @@ def logout():
 @app.route('/profile')
 @login_required
 def profile():
-    # This would interact with your User & Auth Service
-    user = {
-        'id': session['user_id'],
-        'email': session['user_email'],
-        'name': 'Sample User',
-        'address': '123 Main St, Anytown, USA'
-    }
-    
-    # This would interact with your Order & Payment Service
-    orders = [
-        {'id': 1, 'date': '2025-04-01', 'total': 129.99, 'status': 'Delivered'},
-        {'id': 2, 'date': '2025-03-15', 'total': 349.99, 'status': 'Processing'}
-    ]
-    
-    return render_template('profile.html', user=user, orders=orders)
+    try:
+        # Fetch user profile from the User Auth Service
+        user_response = requests.get(f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/users/me", headers={'Authorization': f"Bearer {session.get('user_token')}"})
+        user_response.raise_for_status()
+        user = user_response.json()
+
+        # Fetch user orders from the Order Payment Service
+        orders_response = requests.get(f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/orders", headers={'Authorization': f"Bearer {session.get('user_token')}"})
+        orders_response.raise_for_status()
+        orders = orders_response.json().get('items', [])
+
+        return render_template('profile.html', user=user, orders=orders)
+    except requests.exceptions.RequestException as e:
+        flash('Failed to load profile. Please try again later.', 'error')
+        return redirect(url_for('index'))
 
 if __name__ == '__main__':
+    print("\n\nShubham Starting frontend app...")
     app.run(host='0.0.0.0', port=8080, debug=True)

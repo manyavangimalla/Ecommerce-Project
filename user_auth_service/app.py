@@ -27,6 +27,14 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET')
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 
+# Middleware to log all incoming requests
+@app.before_request
+def log_request():
+    print(f"Incoming request: {request.method} {request.url}", flush=True)
+    print(f"Headers: {dict(request.headers)}")
+    if request.data:
+        print(f"Body: {request.data.decode('utf-8')}")
+
 # User Model
 class User(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -79,6 +87,9 @@ def token_required(f):
 # Routes
 @app.route('/api/auth/register', methods=['POST'])
 def register():
+
+    print("\n\nShubham Register endpoint hit")
+
     data = request.get_json()
     
     if not data or not data.get('email') or not data.get('password'):

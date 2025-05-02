@@ -10,7 +10,7 @@
                 <h4 class="mb-0">Register</h4>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" action="{{ url_for('register') }}">
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="firstName" class="form-label">First Name</label>
@@ -31,7 +31,8 @@
                     </div>
                     <div class="mb-3">
                         <label for="confirmPassword" class="form-label">Confirm Password</label>
-                        <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required>
+                        <input type="password" class="form-control" id="confirmPassword" name="confirmPassword"
+                            required>
                     </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="terms" required>

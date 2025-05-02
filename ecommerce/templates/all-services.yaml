@@ -473,3 +473,40 @@ spec:
   clusterIP: None
   selector:
     app: ecommerce-db
+---
+# Kafka Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: ecommerce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+      - name: kafka
+        image: bitnami/kafka:latest
+        ports:
+        - containerPort: 9092
+---
+# Kafka Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: ecommerce
+spec:
+  selector:
+    app: kafka
+  ports:
+  - name: client
+    port: 9092
+    targetPort: 9092
+  type: ClusterIP

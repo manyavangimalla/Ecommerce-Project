@@ -11,6 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import jwt
 from functools import wraps
+from confluent_kafka import Consumer
 
 app = Flask(__name__)
 
@@ -22,7 +23,7 @@ db_port = os.environ.get('DB_PORT')
 db_name = os.environ.get('DB_NAME')
 
 # Construct the database URL from individual components
-DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}.{db_name}.svc.cluster.local:{db_port}/{db_name}"
 print(f"Connecting to database at {DATABASE_URL.replace(db_password, '******')}")  # Log the URL without exposing password
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -37,6 +38,47 @@ SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'your-password')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'noreply@shopeasy.com')
 
 db = SQLAlchemy(app)
+
+# Kafka consumer configuration
+kafka_consumer = Consumer({
+    'bootstrap.servers': 'kafka:9092',
+    'group.id': 'notification-service',
+    'auto.offset.reset': 'earliest'
+})
+kafka_consumer.subscribe(['order_created'])
+
+def consume_events():
+    while True:
+        msg = kafka_consumer.poll(1.0)  # Poll for messages
+        if msg is None:
+            continue
+        if msg.error():
+            print(f"Consumer error: {msg.error()}")
+            continue
+
+        # Process the event
+        event = json.loads(msg.value().decode('utf-8'))
+        print(f"Received event: {event}")
+
+        if event['event_type'] == 'order_created':
+            # Send notification for order creation
+            user_id = event['user_id']
+            order_id = event['order_id']
+            send_notification(user_id, 'order_placed', {
+                'order_id': order_id,
+                'items': event['items']
+            })
+
+# Start Kafka consumer in a separate thread
+threading.Thread(target=consume_events, daemon=True).start()
+
+# Middleware to log all incoming requests
+@app.before_request
+def log_request():
+    print(f"Incoming request: {request.method} {request.url}")
+    print(f"Headers: {dict(request.headers)}")
+    if request.data:
+        print(f"Body: {request.data.decode('utf-8')}")
 
 # Models
 class Notification(db.Model):
@@ -126,6 +168,39 @@ def send_email(to_email, subject, content):
     except Exception as e:
         print(f"Error sending email: {str(e)}")
         return False
+
+# Helper function to send notification
+def send_notification(user_id, notification_type, data):
+    content = ""
+    notification_data = {}
+    
+    if notification_type == 'order_placed':
+        content = f"Your order #{data.get('order_id')} has been placed successfully."
+        notification_data = {
+            'subject': 'Order Confirmation',
+            'order_id': data.get('order_id'),
+            'items': data.get('items', [])
+        }
+    
+    # Create email notification
+    email_notification = Notification(
+        user_id=user_id,
+        type='email',
+        content=content,
+        data=json.dumps(notification_data)
+    )
+    db.session.add(email_notification)
+    
+    # Create in-app notification
+    app_notification = Notification(
+        user_id=user_id,
+        type='in-app',
+        content=content,
+        data=json.dumps(notification_data)
+    )
+    db.session.add(app_notification)
+    
+    db.session.commit()
 
 # Background worker to process notifications
 def notification_worker():
