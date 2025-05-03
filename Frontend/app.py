@@ -3,9 +3,102 @@ import requests
 import os
 import json
 from functools import wraps
+from db import db, get_user_by_email, create_user, User
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize the db with the app
+db.init_app(app)
+
+# Add this import at the top with your other imports
+import random
+from datetime import datetime, timedelta
+
+# Add this global variable to temporarily store verification codes
+# In a real application, you would use a database
+VERIFICATION_CODES = {}  # Format: {email: {'code': '123456', 'expires': datetime}}
+
+@app.route('/request_verification_code', methods=['POST'])
+def request_verification_code():
+    # Get email from request
+    data = request.get_json()
+    email = data.get('email')
+    
+    if not email:
+        return jsonify({'success': False, 'message': 'Email is required'})
+    
+    # Verify user exists in database
+    user = get_user_by_email(email)
+    if not user:
+        return jsonify({'success': False, 'message': 'No account found with this email'})
+    
+    try:
+        # Generate a 6-digit verification code
+        verification_code = str(random.randint(100000, 999999))
+        
+        # Store the code with expiration time (10 minutes from now)
+        expiration_time = datetime.now() + timedelta(minutes=10)
+        VERIFICATION_CODES[email] = {
+            'code': verification_code,
+            'expires': expiration_time
+        }
+        
+        # In a production app, send email with SendGrid
+        # send_verification_email(email, verification_code)
+        
+        # For testing purposes, print the code to console
+        print(f"Verification code for {email}: {verification_code}")
+        
+        return jsonify({'success': True, 'message': 'Verification code sent successfully'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/verify_code', methods=['POST'])
+def verify_code():
+    email = request.form.get('email')
+    verification_code = request.form.get('verification_code')
+    
+    if not email or not verification_code:
+        flash('Email and verification code are required', 'error')
+        return redirect(url_for('login'))
+    
+    # Check if the code exists and is valid
+    stored_data = VERIFICATION_CODES.get(email)
+    if not stored_data:
+        flash('No verification code found for this email', 'error')
+        return redirect(url_for('login'))
+    
+    # Check if code is expired
+    if datetime.now() > stored_data['expires']:
+        # Remove expired code
+        del VERIFICATION_CODES[email]
+        flash('Verification code has expired. Please request a new one', 'error')
+        return redirect(url_for('login'))
+    
+    # Check if code matches
+    if verification_code != stored_data['code']:
+        flash('Invalid verification code', 'error')
+        return redirect(url_for('login'))
+    
+    # Code is valid, log the user in
+    user = get_user_by_email(email)
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('login'))
+    
+    # Set session variables
+    session['user_id'] = user.id
+    session['user_email'] = user.email
+    
+    # Remove the used code
+    del VERIFICATION_CODES[email]
+    
+    flash('Logged in successfully', 'success')
+    return redirect(url_for('index'))
 
 # Mock data - In production this would come from your microservices
 PRODUCTS = [
@@ -124,24 +217,63 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+        login_type = request.form.get('login_type', 'password')
         
-        # In production, validate against User & Auth Service
-        if email == 'user@example.com' and password == 'password':
-            session['user_id'] = 1
-            session['user_email'] = email
-            flash('Logged in successfully', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid credentials', 'error')
+        if login_type == 'password':
+            # Get user from database
+            user = get_user_by_email(email)
+            
+            # Print debug info
+            print(f"Login attempt for email: {email}")
+            print(f"User found: {user is not None}")
+            
+            # Check if user exists and password matches
+            if user and user.check_password(password):
+                session['user_id'] = user.id
+                session['user_email'] = user.email
+                flash('Logged in successfully', 'success')
+                return redirect(url_for('index'))
+            else:
+                if user:
+                    print("Password check failed")
+                flash('Invalid email or password', 'danger')
     
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        # This would interact with your User & Auth Service
-        flash('Registration successful! Please log in.', 'success')
-        return redirect(url_for('login'))
+        email = request.form.get('email')
+        password = request.form.get('password')
+        first_name = request.form.get('first_name', '')
+        last_name = request.form.get('last_name', '')
+        address = request.form.get('address', '')
+        city = request.form.get('city', '')
+        state = request.form.get('state', '')
+        zip_code = request.form.get('zip_code', '')
+        
+        # Check if user already exists
+        existing_user = get_user_by_email(email)
+        if existing_user:
+            flash('Email already registered', 'danger')
+            return render_template('register.html')
+        
+        # Create new user
+        try:
+            user = create_user(
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                address=address,
+                city=city,
+                state=state,
+                zip_code=zip_code
+            )
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            flash(f'Registration failed: {str(e)}', 'danger')
     
     return render_template('register.html')
 
@@ -154,13 +286,12 @@ def logout():
 @app.route('/profile')
 @login_required
 def profile():
-    # This would interact with your User & Auth Service
-    user = {
-        'id': session['user_id'],
-        'email': session['user_email'],
-        'name': 'Sample User',
-        'address': '123 Main St, Anytown, USA'
-    }
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+    
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('login'))
     
     # This would interact with your Order & Payment Service
     orders = [
@@ -168,7 +299,11 @@ def profile():
         {'id': 2, 'date': '2025-03-15', 'total': 349.99, 'status': 'Processing'}
     ]
     
-    return render_template('profile.html', user=user, orders=orders)
+    return render_template('profile.html', user=user.to_dict(), orders=orders)
+
+# Setup database tables
+with app.app_context():
+    db.create_all()  # Create database tables if they don't exist
 
 if __name__ == '__main__':
     app.run(debug=True)
