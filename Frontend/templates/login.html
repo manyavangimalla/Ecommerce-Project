@@ -10,29 +10,181 @@
                 <h4 class="mb-0">Login</h4>
             </div>
             <div class="card-body">
-                <form method="post">
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Email address</label>
-                        <input type="email" class="form-control" id="email" name="email" required>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <!-- Login Tabs -->
+                <ul class="nav nav-tabs mb-3" id="loginTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="password-tab" data-bs-toggle="tab" data-bs-target="#password-pane" 
+                                type="button" role="tab" aria-controls="password-pane" aria-selected="true">
+                            Password Login
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code-pane" 
+                                type="button" role="tab" aria-controls="code-pane" aria-selected="false">
+                            Verification Code
+                        </button>
+                    </li>
+                </ul>
+                
+                <!-- Tab Content -->
+                <div class="tab-content" id="loginTabsContent">
+                    <!-- Password Login -->
+                    <div class="tab-pane fade show active" id="password-pane" role="tabpanel" aria-labelledby="password-tab">
+                        <form method="post" action="{{ url_for('login') }}">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email address</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
+                                <label class="form-check-label" for="rememberMe">Remember me</label>
+                            </div>
+                            <input type="hidden" name="login_type" value="password">
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">Login</button>
+                            </div>
+                        </form>
                     </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
+                    
+                    <!-- Verification Code Login -->
+                    <div class="tab-pane fade" id="code-pane" role="tabpanel" aria-labelledby="code-tab">
+                        <!-- Request Code Form -->
+                        <div id="request-code-section">
+                            <div class="mb-3">
+                                <label for="email-code" class="form-label">Email address</label>
+                                <input type="email" class="form-control" id="email-code" required>
+                            </div>
+                            <div class="d-grid">
+                                <button type="button" id="request-code-btn" class="btn btn-primary">Send Verification Code</button>
+                            </div>
+                            
+                            <!-- Loading spinner -->
+                            <div id="code-loader" class="text-center my-3" style="display: none;">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Sending verification code...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Verify Code Form -->
+                        <div id="verify-code-section" style="display: none;">
+                            <form method="post" action="{{ url_for('verify_code') }}">
+                                <div class="mb-3">
+                                    <label for="verification-code" class="form-label">Verification Code</label>
+                                    <input type="text" class="form-control" id="verification-code" name="verification_code" 
+                                           required pattern="[0-9]{6}" maxlength="6">
+                                    <div class="form-text" id="code-sent-email"></div>
+                                </div>
+                                <input type="hidden" id="email-hidden" name="email">
+                                <input type="hidden" name="login_type" value="verification_code">
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">Verify & Login</button>
+                                </div>
+                                <div class="mt-3 text-center">
+                                    <a href="#" id="resend-code" class="me-2">Resend code</a>
+                                    <a href="#" id="change-email">Change email</a>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="rememberMe">
-                        <label class="form-check-label" for="rememberMe">Remember me</label>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Login</button>
-                    </div>
-                </form>
+                </div>
+                
                 <div class="mt-3 text-center">
                     <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
-                    <p><a href="#">Forgot password?</a></p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Elements for verification code flow
+        const requestCodeSection = document.getElementById('request-code-section');
+        const verifyCodeSection = document.getElementById('verify-code-section');
+        const emailInput = document.getElementById('email-code');
+        const emailHidden = document.getElementById('email-hidden');
+        const codeSentEmail = document.getElementById('code-sent-email');
+        const codeLoader = document.getElementById('code-loader');
+        const requestCodeBtn = document.getElementById('request-code-btn');
+        const resendCodeBtn = document.getElementById('resend-code');
+        const changeEmailBtn = document.getElementById('change-email');
+        
+        // Function to request verification code
+        function requestVerificationCode() {
+            const email = emailInput.value;
+            
+            if (!email || !email.includes('@')) {
+                alert('Please enter a valid email address');
+                return;
+            }
+            
+            // Show loading spinner
+            codeLoader.style.display = 'block';
+            requestCodeBtn.disabled = true;
+            
+            // Make API request to get verification code
+            fetch('{{ url_for("request_verification_code") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: email }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loading spinner
+                codeLoader.style.display = 'none';
+                requestCodeBtn.disabled = false;
+                
+                if (data.success) {
+                    // Show verification code input section
+                    requestCodeSection.style.display = 'none';
+                    verifyCodeSection.style.display = 'block';
+                    emailHidden.value = email;
+                    codeSentEmail.textContent = `Code sent to: ${email}`;
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                // Hide loading spinner
+                codeLoader.style.display = 'none';
+                requestCodeBtn.disabled = false;
+                
+                console.error('Error:', error);
+                alert('An error occurred while sending the verification code.');
+            });
+        }
+        
+        // Event listeners
+        requestCodeBtn.addEventListener('click', requestVerificationCode);
+        
+        resendCodeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            requestVerificationCode();
+        });
+        
+        changeEmailBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            requestCodeSection.style.display = 'block';
+            verifyCodeSection.style.display = 'none';
+        });
+    });
+</script>
 {% endblock %}
