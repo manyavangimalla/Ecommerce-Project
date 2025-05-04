@@ -23,14 +23,18 @@
                 <!-- Login Tabs -->
                 <ul class="nav nav-tabs mb-3" id="loginTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="password-tab" data-bs-toggle="tab" data-bs-target="#password-pane" 
-                                type="button" role="tab" aria-controls="password-pane" aria-selected="true">
+                        <button class="nav-link {% if not request.args.get('tab') or request.args.get('tab') == 'password' %}active{% endif %}" 
+                                id="password-tab" data-bs-toggle="tab" data-bs-target="#password-pane" 
+                                type="button" role="tab" aria-controls="password-pane" 
+                                aria-selected="{% if not request.args.get('tab') or request.args.get('tab') == 'password' %}true{% else %}false{% endif %}">
                             Password Login
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code-pane" 
-                                type="button" role="tab" aria-controls="code-pane" aria-selected="false">
+                        <button class="nav-link {% if request.args.get('tab') == 'verification' %}active{% endif %}" 
+                                id="code-tab" data-bs-toggle="tab" data-bs-target="#code-pane" 
+                                type="button" role="tab" aria-controls="code-pane" 
+                                aria-selected="{% if request.args.get('tab') == 'verification' %}true{% else %}false{% endif %}">
                             Verification Code
                         </button>
                     </li>
@@ -39,7 +43,8 @@
                 <!-- Tab Content -->
                 <div class="tab-content" id="loginTabsContent">
                     <!-- Password Login -->
-                    <div class="tab-pane fade show active" id="password-pane" role="tabpanel" aria-labelledby="password-tab">
+                    <div class="tab-pane fade {% if not request.args.get('tab') or request.args.get('tab') == 'password' %}show active{% endif %}" 
+                         id="password-pane" role="tabpanel" aria-labelledby="password-tab">
                         <form method="post" action="{{ url_for('login') }}">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Email address</label>
@@ -61,19 +66,22 @@
                     </div>
                     
                     <!-- Verification Code Login -->
-                    <div class="tab-pane fade" id="code-pane" role="tabpanel" aria-labelledby="code-tab">
+                    <div class="tab-pane fade {% if request.args.get('tab') == 'verification' %}show active{% endif %}" 
+                         id="code-pane" role="tabpanel" aria-labelledby="code-tab">
                         <!-- Request Code Form -->
-                        <div id="request-code-section">
-                            <div class="mb-3">
-                                <label for="email-code" class="form-label">Email address</label>
-                                <input type="email" class="form-control" id="email-code" required>
-                            </div>
-                            <div class="d-grid">
-                                <button type="button" id="request-code-btn" class="btn btn-primary">Send Verification Code</button>
-                            </div>
+                        <div id="request-code-section" {% if session.get('verification_email') %}style="display: none;"{% endif %}>
+                            <form id="verification-form">
+                                <div class="mb-3">
+                                    <label for="email-code" class="form-label">Email address</label>
+                                    <input type="email" class="form-control" id="email-code" name="email" required>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" id="send-code-btn" class="btn btn-primary">Send Verification Code</button>
+                                </div>
+                            </form>
                             
                             <!-- Loading spinner -->
-                            <div id="code-loader" class="text-center my-3" style="display: none;">
+                            <div id="code-spinner" class="text-center my-3" style="display: none;">
                                 <div class="spinner-border text-primary" role="status">
                                     <span class="visually-hidden">Loading...</span>
                                 </div>
@@ -82,22 +90,27 @@
                         </div>
                         
                         <!-- Verify Code Form -->
-                        <div id="verify-code-section" style="display: none;">
+                        <div id="verify-code-section" {% if not session.get('verification_email') %}style="display: none;"{% endif %}>
                             <form method="post" action="{{ url_for('verify_code') }}">
                                 <div class="mb-3">
                                     <label for="verification-code" class="form-label">Verification Code</label>
-                                    <input type="text" class="form-control" id="verification-code" name="verification_code" 
+                                    <input type="text" class="form-control" id="verification-code" name="code" 
                                            required pattern="[0-9]{6}" maxlength="6">
-                                    <div class="form-text" id="code-sent-email"></div>
+                                    <div class="form-text" id="code-sent-email">
+                                        {% if session.get('verification_email') %}
+                                            Code sent to: {{ session.get('verification_email') }}
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                <input type="hidden" id="email-hidden" name="email">
-                                <input type="hidden" name="login_type" value="verification_code">
                                 <div class="d-grid">
                                     <button type="submit" class="btn btn-primary">Verify & Login</button>
                                 </div>
-                                <div class="mt-3 text-center">
-                                    <a href="#" id="resend-code" class="me-2">Resend code</a>
-                                    <a href="#" id="change-email">Change email</a>
+                                <div class="mt-3 d-flex justify-content-between">
+                                    <form id="resend-form">
+                                        <input type="hidden" name="email" value="{{ session.get('verification_email', '') }}" id="resend-email">
+                                        <button type="submit" class="btn btn-link p-0">Resend Code</button>
+                                    </form>
+                                    <button type="button" id="change-email" class="btn btn-link p-0">Use Different Email</button>
                                 </div>
                             </form>
                         </div>
@@ -118,73 +131,130 @@
         const requestCodeSection = document.getElementById('request-code-section');
         const verifyCodeSection = document.getElementById('verify-code-section');
         const emailInput = document.getElementById('email-code');
-        const emailHidden = document.getElementById('email-hidden');
+        const verificationForm = document.getElementById('verification-form');
+        const resendForm = document.getElementById('resend-form');
+        const resendEmail = document.getElementById('resend-email');
         const codeSentEmail = document.getElementById('code-sent-email');
-        const codeLoader = document.getElementById('code-loader');
-        const requestCodeBtn = document.getElementById('request-code-btn');
-        const resendCodeBtn = document.getElementById('resend-code');
         const changeEmailBtn = document.getElementById('change-email');
+        const codeSpinner = document.getElementById('code-spinner');
         
-        // Function to request verification code
-        function requestVerificationCode() {
-            const email = emailInput.value;
-            
-            if (!email || !email.includes('@')) {
-                alert('Please enter a valid email address');
-                return;
-            }
-            
-            // Show loading spinner
-            codeLoader.style.display = 'block';
-            requestCodeBtn.disabled = true;
-            
-            // Make API request to get verification code
-            fetch('{{ url_for("request_verification_code") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email: email }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Hide loading spinner
-                codeLoader.style.display = 'none';
-                requestCodeBtn.disabled = false;
+        // Check URL for tab parameter and set active tab accordingly
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        if (tabParam === 'verification') {
+            document.getElementById('code-tab').click();
+        }
+        
+        // Handle sending verification code
+        if (verificationForm) {
+            verificationForm.addEventListener('submit', function(e) {
+                e.preventDefault();
                 
-                if (data.success) {
-                    // Show verification code input section
-                    requestCodeSection.style.display = 'none';
-                    verifyCodeSection.style.display = 'block';
-                    emailHidden.value = email;
-                    codeSentEmail.textContent = `Code sent to: ${email}`;
-                } else {
-                    alert('Error: ' + data.message);
+                const email = emailInput.value;
+                if (!email || !email.includes('@')) {
+                    alert('Please enter a valid email address');
+                    return;
                 }
-            })
-            .catch(error => {
-                // Hide loading spinner
-                codeLoader.style.display = 'none';
-                requestCodeBtn.disabled = false;
                 
-                console.error('Error:', error);
-                alert('An error occurred while sending the verification code.');
+                // Show loading spinner
+                codeSpinner.style.display = 'block';
+                document.getElementById('send-code-btn').disabled = true;
+                
+                // Create form data
+                const formData = new FormData();
+                formData.append('email', email);
+                
+                // Make request to send verification code
+                fetch('{{ url_for("send_verification_code") }}', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    if (html.includes('not registered')) {
+                        // Hide loading spinner
+                        codeSpinner.style.display = 'none';
+                        document.getElementById('send-code-btn').disabled = false;
+                        
+                        // Show confirmation dialog
+                        if (confirm('This email is not registered. Would you like to create an account?')) {
+                            window.location.href = '{{ url_for("register") }}';
+                        }
+                    } else {
+                        // Reload the page to show the flash message
+                        window.location.href = '{{ url_for("login", tab="verification") }}';
+                    }
+                })
+                .catch(error => {
+                    // Hide loading spinner
+                    codeSpinner.style.display = 'none';
+                    document.getElementById('send-code-btn').disabled = false;
+                    
+                    console.error('Error:', error);
+                    alert('This email is not registered. Please create an account first.');
+                    
+                    if (confirm('Would you like to register now?')) {
+                        window.location.href = '{{ url_for("register") }}';
+                    }
+                });
             });
         }
         
-        // Event listeners
-        requestCodeBtn.addEventListener('click', requestVerificationCode);
+        // Handle resending verification code
+        if (resendForm) {
+            resendForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Show loading spinner
+                codeSpinner.style.display = 'block';
+                resendForm.querySelector('button').disabled = true;
+                
+                // Create form data
+                const formData = new FormData();
+                formData.append('email', resendEmail.value);
+                
+                // Make request to resend verification code
+                fetch('{{ url_for("resend_verification_code") }}', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    // Reload the page to show the flash message
+                    window.location.href = '{{ url_for("login", tab="verification") }}';
+                })
+                .catch(error => {
+                    // Hide loading spinner
+                    codeSpinner.style.display = 'none';
+                    resendForm.querySelector('button').disabled = false;
+                    
+                    console.error('Error:', error);
+                    alert('An error occurred while resending the verification code.');
+                });
+            });
+        }
         
-        resendCodeBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            requestVerificationCode();
-        });
-        
-        changeEmailBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            requestCodeSection.style.display = 'block';
-            verifyCodeSection.style.display = 'none';
-        });
+        // Handle "Change email" button
+        if (changeEmailBtn) {
+            changeEmailBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                requestCodeSection.style.display = 'block';
+                verifyCodeSection.style.display = 'none';
+                emailInput.value = ''; // Clear the email input
+                
+                // Clear session data
+                fetch('{{ url_for("clear_verification_session") }}', {
+                    method: 'POST'
+                }).catch(error => console.error('Error clearing session:', error));
+            });
+        }
     });
 </script>
 {% endblock %}

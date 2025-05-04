@@ -1,10 +1,35 @@
+import string
+import random
+import os
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import requests
-import os
-import json
 from functools import wraps
 from db import db, get_user_by_email, create_user, User
 
+# Import for SendGrid
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
+# Load dotenv for environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+# Disable SSL verification globally for development
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import ssl
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    # Legacy Python that doesn't verify HTTPS certificates by default
+    pass
+else:
+    # Handle target environment that doesn't support HTTPS verification
+    ssl._create_default_https_context = _create_unverified_https_context
+
+# Also disable for requests
+requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
@@ -21,84 +46,10 @@ from datetime import datetime, timedelta
 # In a real application, you would use a database
 VERIFICATION_CODES = {}  # Format: {email: {'code': '123456', 'expires': datetime}}
 
-@app.route('/request_verification_code', methods=['POST'])
-def request_verification_code():
-    # Get email from request
-    data = request.get_json()
-    email = data.get('email')
-    
-    if not email:
-        return jsonify({'success': False, 'message': 'Email is required'})
-    
-    # Verify user exists in database
-    user = get_user_by_email(email)
-    if not user:
-        return jsonify({'success': False, 'message': 'No account found with this email'})
-    
-    try:
-        # Generate a 6-digit verification code
-        verification_code = str(random.randint(100000, 999999))
-        
-        # Store the code with expiration time (10 minutes from now)
-        expiration_time = datetime.now() + timedelta(minutes=10)
-        VERIFICATION_CODES[email] = {
-            'code': verification_code,
-            'expires': expiration_time
-        }
-        
-        # In a production app, send email with SendGrid
-        # send_verification_email(email, verification_code)
-        
-        # For testing purposes, print the code to console
-        print(f"Verification code for {email}: {verification_code}")
-        
-        return jsonify({'success': True, 'message': 'Verification code sent successfully'})
-    
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/verify_code', methods=['POST'])
-def verify_code():
-    email = request.form.get('email')
-    verification_code = request.form.get('verification_code')
-    
-    if not email or not verification_code:
-        flash('Email and verification code are required', 'error')
-        return redirect(url_for('login'))
-    
-    # Check if the code exists and is valid
-    stored_data = VERIFICATION_CODES.get(email)
-    if not stored_data:
-        flash('No verification code found for this email', 'error')
-        return redirect(url_for('login'))
-    
-    # Check if code is expired
-    if datetime.now() > stored_data['expires']:
-        # Remove expired code
-        del VERIFICATION_CODES[email]
-        flash('Verification code has expired. Please request a new one', 'error')
-        return redirect(url_for('login'))
-    
-    # Check if code matches
-    if verification_code != stored_data['code']:
-        flash('Invalid verification code', 'error')
-        return redirect(url_for('login'))
-    
-    # Code is valid, log the user in
-    user = get_user_by_email(email)
-    if not user:
-        flash('User not found', 'error')
-        return redirect(url_for('login'))
-    
-    # Set session variables
-    session['user_id'] = user.id
-    session['user_email'] = user.email
-    
-    # Remove the used code
-    del VERIFICATION_CODES[email]
-    
-    flash('Logged in successfully', 'success')
-    return redirect(url_for('index'))
+# Add the new function here
+def generate_verification_code(length=6):
+    return ''.join(random.choices(string.digits, k=length))
 
 # Mock data - In production this would come from your microservices
 PRODUCTS = [
@@ -301,6 +252,193 @@ def profile():
     
     return render_template('profile.html', user=user.to_dict(), orders=orders)
 
+@app.route('/send_verification_code', methods=['POST'])
+def send_verification_code():
+    email = request.form.get('email')
+    
+    if not email:
+        flash('Email address is required', 'danger')
+        return redirect(url_for('login'))
+    
+    # Check if user exists
+    user = get_user_by_email(email)
+    if not user:
+        # Clear message and show a specific "not registered" message
+        flash('This email is not registered. Please create an account first.', 'danger')
+        # Add JavaScript to show a confirmation dialog after page loads
+        return """
+        <script>
+            if (confirm('This email is not registered. Would you like to create an account?')) {
+                window.location.href = '""" + url_for('register') + """';
+            } else {
+                window.location.href = '""" + url_for('login') + """';
+            }
+        </script>
+        """
+    
+    # Generate verification code
+    code = generate_verification_code()
+    print(f"Generated verification code: {code} for {email}")
+    
+    # Store code in session or database (with expiration)
+    session['verification_code'] = code
+    session['verification_email'] = email
+    session['code_expiration'] = (datetime.now() + timedelta(minutes=10)).timestamp()
+    
+    # Your verified sender email
+    from_email = "your-verified-sender@yourdomain.com"  # REPLACE with your verified email
+    
+    message = Mail(
+        from_email=from_email,
+        to_emails=email,
+        subject='ElectroCart Verification Code',
+        html_content=f'''
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>ElectroCart Verification Code</h2>
+            <p>Your verification code is:</p>
+            <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold;">
+                {code}
+            </div>
+            <p>This code will expire in 10 minutes.</p>
+            <p>If you did not request this code, please ignore this email.</p>
+        </div>
+        '''
+    )
+    
+    try:
+        sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+        # Disable SSL verification for this session
+        sg.client.session.verify = False
+        
+        print("Sending email via SendGrid...")
+        response = sg.send(message)
+        
+        print(f"SendGrid response status code: {response.status_code}")
+        
+        if response.status_code >= 200 and response.status_code < 300:
+            flash('Verification code sent to your email. Please check your inbox and spam folder.', 'success')
+        else:
+            flash(f'Error from SendGrid: Status code {response.status_code}', 'danger')
+            
+        return redirect(url_for('login', tab='verification'))
+        
+    except Exception as e:
+        error_message = str(e)
+        print(f"Error sending email via SendGrid: {error_message}")
+        flash(f'Error sending verification code: {error_message}', 'danger')
+        return redirect(url_for('login'))
+
+@app.route('/resend_verification_code', methods=['POST'])
+def resend_verification_code():
+    email = request.form.get('email') or session.get('verification_email')
+    
+    if not email:
+        flash('Email address not found. Please start the login process again.', 'danger')
+        return redirect(url_for('login'))
+    
+    # Check if user exists
+    user = get_user_by_email(email)
+    if not user:
+        flash('Email not registered. Please create an account first.', 'danger')
+        return redirect(url_for('register'))
+    
+    # Generate new verification code
+    code = generate_verification_code()
+    print(f"Generated new verification code: {code} for {email}")
+    
+    # Update session with new code
+    session['verification_code'] = code
+    session['verification_email'] = email
+    session['code_expiration'] = (datetime.now() + timedelta(minutes=10)).timestamp()
+    
+    # Your verified sender email
+    from_email = "your-verified-sender@yourdomain.com"  # REPLACE with your verified email
+    
+    message = Mail(
+        from_email=from_email,
+        to_emails=email,
+        subject='ElectroCart New Verification Code',
+        html_content=f'''
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>ElectroCart Verification Code</h2>
+            <p>Your new verification code is:</p>
+            <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold;">
+                {code}
+            </div>
+            <p>This code will expire in 10 minutes.</p>
+            <p>If you did not request this code, please ignore this email.</p>
+        </div>
+        '''
+    )
+    
+    try:
+        sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+        # Disable SSL verification for this session
+        sg.client.session.verify = False
+        
+        print("Resending email via SendGrid...")
+        response = sg.send(message)
+        
+        print(f"SendGrid response status code: {response.status_code}")
+        
+        if response.status_code >= 200 and response.status_code < 300:
+            flash('New verification code sent to your email. Please check your inbox and spam folder.', 'success')
+        else:
+            flash(f'Error from SendGrid: Status code {response.status_code}', 'danger')
+            
+        return redirect(url_for('login', tab='verification'))
+        
+    except Exception as e:
+        error_message = str(e)
+        print(f"Error sending email via SendGrid: {error_message}")
+        flash(f'Error sending verification code: {error_message}', 'danger')
+        return redirect(url_for('login'))
+    
+@app.route('/verify_code', methods=['POST'])
+def verify_code():
+    # Get the verification code from the form
+    entered_code = request.form.get('code')
+    email = session.get('verification_email')
+    
+    stored_code = session.get('verification_code')
+    expiration = session.get('code_expiration')
+    
+    # Check if code is valid and not expired
+    if not stored_code or not email or not expiration:
+        flash('Session expired, please try again', 'danger')
+        return redirect(url_for('login'))
+    
+    if datetime.now().timestamp() > expiration:
+        flash('Verification code expired, please request a new one', 'danger')
+        return redirect(url_for('login', tab='verification'))
+    
+    if entered_code != stored_code:
+        flash('Invalid verification code', 'danger')
+        return redirect(url_for('login', tab='verification'))
+    
+    # Code is valid, log in the user
+    user = get_user_by_email(email)
+    if user:
+        session['user_id'] = user.id
+        session['user_email'] = user.email
+        
+        # Clean up session variables
+        session.pop('verification_code', None)
+        session.pop('verification_email', None)
+        session.pop('code_expiration', None)
+        
+        flash('Logged in successfully', 'success')
+        return redirect(url_for('index'))
+    else:
+        flash('User not found', 'danger')
+        return redirect(url_for('login'))
+@app.route('/clear_verification_session', methods=['POST'])
+def clear_verification_session():
+    """Clear verification related session data"""
+    session.pop('verification_code', None)
+    session.pop('verification_email', None)
+    session.pop('code_expiration', None)
+    return jsonify({'success': True})
 # Setup database tables
 with app.app_context():
     db.create_all()  # Create database tables if they don't exist
