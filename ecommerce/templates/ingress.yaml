@@ -6,16 +6,21 @@ metadata:
   namespace: ecommerce
   labels:
     {{- include "ecommerce.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
   annotations:
+    kubernetes.io/ingress.class: "gce"  # Enable GKE ingress
+    networking.gke.io/managed-certificates: "ecommerce-cert"  # Use Google-managed certificate
+    {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   {{- with .Values.ingress.className }}
   ingressClassName: {{ . }}
   {{- end }}
-  {{- if .Values.ingress.tls }}
   tls:
+    - hosts:
+        - "your-custom-domain.com"  # Replace with your domain
+      secretName: "ecommerce-tls"  # Replace with your TLS secret name
+    {{- if .Values.ingress.tls }}
     {{- range .Values.ingress.tls }}
     - hosts:
         {{- range .hosts }}
@@ -23,7 +28,7 @@ spec:
         {{- end }}
       secretName: {{ .secretName }}
     {{- end }}
-  {{- end }}
+    {{- end }}
   rules:
     {{- range .Values.ingress.hosts }}
     - host: {{ .host | quote }}
@@ -31,14 +36,12 @@ spec:
         paths:
           {{- range .paths }}
           - path: {{ .path }}
-            {{- with .pathType }}
-            pathType: {{ . }}
-            {{- end }}
+            pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "ecommerce.fullname" $ }}
+                name: {{ .backend.serviceName }}
                 port:
-                  number: {{ $.Values.service.port }}
+                  number: {{ .backend.servicePort }}
           {{- end }}
     {{- end }}
 {{- end }}

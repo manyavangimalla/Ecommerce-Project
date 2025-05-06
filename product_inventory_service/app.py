@@ -455,4 +455,4 @@ if __name__ == '__main__':
                 db.session.add(Product(**product_data))
             db.session.commit()
             
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)

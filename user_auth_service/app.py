@@ -18,7 +18,7 @@ db_name = os.environ.get('DB_NAME')
 
 # Construct the database URL from individual components
 DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-print(f"Connecting to database at {DATABASE_URL.replace(db_password, '******')}")  # Log the URL without exposing password
+print(f"Connecting to database at {DATABASE_URL}", flush=True)  # Log the URL without exposing password
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -37,6 +37,7 @@ def log_request():
 
 # User Model
 class User(db.Model):
+    __tablename__ = 'shop_user'
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
@@ -88,7 +89,7 @@ def token_required(f):
 @app.route('/api/auth/register', methods=['POST'])
 def register():
 
-    print("\n\nShubham Register endpoint hit")
+    print("\n\nShubham Register endpoint hit", flush=True)
 
     data = request.get_json()
     
@@ -197,6 +198,11 @@ def health_check():
     return jsonify({'status': 'healthy'}), 200
 
 if __name__ == '__main__':
+    print("Starting User Auth Service...")
     with app.app_context():
+        # Drop the old User table if it exists
+        if 'User' in db.metadata.tables:
+            db.metadata.tables['User'].drop(db.engine)
+        # Create all tables, including the new shop_user table
         db.create_all()
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)

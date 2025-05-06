@@ -23,7 +23,7 @@ db_port = os.environ.get('DB_PORT')
 db_name = os.environ.get('DB_NAME')
 
 # Construct the database URL from individual components
-DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}.{db_name}.svc.cluster.local:{db_port}/{db_name}"
+DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 print(f"Connecting to database at {DATABASE_URL.replace(db_password, '******')}")  # Log the URL without exposing password
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -398,4 +398,4 @@ def health_check():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=5004, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)

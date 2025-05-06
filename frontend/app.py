@@ -194,18 +194,19 @@ def register():
         # Send data to the User Auth Service via the API Gateway
         try:
             print("\n\n\nShubham Register endpoint hit 333", flush=True)
-            print(f'API_URL: {os.environ.get("API_URL", "http://localhost:5000")}', flush=True)
-            response = requests.post("http://localhost:5000/api/auth/register", json=user_data)
+            print(f'API_URL: {os.environ.get("API_URL")}', flush=True)
+            api_url = os.environ.get("API_URL")
+            response = requests.post(f"{api_url}/api/auth/register", json=user_data)
             print("\n\n\nShubham Register endpoint hit 444", flush=True)
             if response.status_code == 201:
                 flash('Registration successful! Please log in.', 'success')
                 return redirect(url_for('login'))
             else:
                 error_message = response.json().get('message', 'Registration failed. Please try again.')
-                print(f"\n\nShubham Error during registration: {error_message}", flush=True)
+                print(f"\n\nShubham Error during registration 1: {error_message}", flush=True)
                 flash(error_message, 'error')
         except requests.exceptions.RequestException as e:
-            print(f"\n\nShubham Error during registration: {str(e)}", flush=True)
+            print(f"\n\nShubham Error during registration 2: {str(e)}", flush=True)
             flash('An error occurred while connecting to the server. Please try again later.', 'error')
 
     return render_template('register.html')
@@ -221,12 +222,12 @@ def logout():
 def profile():
     try:
         # Fetch user profile from the User Auth Service
-        user_response = requests.get(f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/users/me", headers={'Authorization': f"Bearer {session.get('user_token')}"})
+        user_response = requests.get(f"{os.environ.get('API_URL')}/api/users/me", headers={'Authorization': f"Bearer {session.get('user_token')}"})
         user_response.raise_for_status()
         user = user_response.json()
 
         # Fetch user orders from the Order Payment Service
-        orders_response = requests.get(f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/orders", headers={'Authorization': f"Bearer {session.get('user_token')}"})
+        orders_response = requests.get(f"{os.environ.get('API_URL')}/api/orders", headers={'Authorization': f"Bearer {session.get('user_token')}"})
         orders_response.raise_for_status()
         orders = orders_response.json().get('items', [])
 

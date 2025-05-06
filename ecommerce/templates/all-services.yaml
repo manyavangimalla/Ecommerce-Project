@@ -11,13 +11,13 @@ metadata:
   name: ecommerce-config
   namespace: ecommerce
 data:
-  DB_HOST: "db-service"
-  API_GATEWAY_URL: "http://api-gateway-service:8000"
-  PRODUCT_SERVICE_URL: "http://product-inventory-service:8001"
-  USER_SERVICE_URL: "http://user-auth-service:8002"
-  ORDER_SERVICE_URL: "http://order-payment-service:8003"
-  NOTIFICATION_SERVICE_URL: "http://notification-service:8004"
-  DEPLOY_ENV: "local" # Toggle between 'local' and 'cloud'
+  DB_HOST: "ecommerce-db"
+  API_GATEWAY_URL: "http://api-gateway"
+  PRODUCT_SERVICE_URL: "http://product-inventory-service"
+  USER_SERVICE_URL: "http://user-auth-service"
+  ORDER_SERVICE_URL: "http://order-payment-service"
+  NOTIFICATION_SERVICE_URL: "http://notification-service"
+  DEPLOY_ENV: "local"
 ---
 apiVersion: v1
 kind: Secret
@@ -49,7 +49,7 @@ spec:
     spec:
       containers:
       - name: user-auth-service
-        image: user_auth_service:local # Use local image for local deployment
+        image: user_auth_service:local
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -75,7 +75,7 @@ spec:
               name: ecommerce-secrets
               key: JWT_SECRET
         ports:
-        - containerPort: 8002
+        - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -86,8 +86,8 @@ spec:
   selector:
     app: user-auth-service
   ports:
-  - port: 8002
-    targetPort: 8002
+  - port: 80
+    targetPort: 8080
   type: ClusterIP
 ---
 # Product Inventory Service
@@ -109,7 +109,7 @@ spec:
     spec:
       containers:
       - name: product-inventory-service
-        image: product_inventory_service:local # Use local image for local deployment
+        image: product_inventory_service:local
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -135,7 +135,7 @@ spec:
               name: ecommerce-secrets
               key: JWT_SECRET
         ports:
-        - containerPort: 8001
+        - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -146,8 +146,8 @@ spec:
   selector:
     app: product-inventory-service
   ports:
-  - port: 8001
-    targetPort: 8001
+  - port: 80
+    targetPort: 8080
   type: ClusterIP
 ---
 # Order Payment Service
@@ -169,7 +169,7 @@ spec:
     spec:
       containers:
       - name: order-payment-service
-        image: order_payment_service:local # Use local image for local deployment
+        image: order_payment_service:local
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -195,7 +195,7 @@ spec:
               name: ecommerce-secrets
               key: JWT_SECRET
         ports:
-        - containerPort: 8003
+        - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -206,8 +206,8 @@ spec:
   selector:
     app: order-payment-service
   ports:
-  - port: 8003
-    targetPort: 8003
+  - port: 80
+    targetPort: 8080
   type: ClusterIP
 ---
 # Notification Service
@@ -229,7 +229,7 @@ spec:
     spec:
       containers:
       - name: notification-service
-        image: notification_service:local # Use local image for local deployment
+        image: notification_service:local
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -255,7 +255,7 @@ spec:
               name: ecommerce-secrets
               key: JWT_SECRET
         ports:
-        - containerPort: 8004
+        - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -266,8 +266,8 @@ spec:
   selector:
     app: notification-service
   ports:
-  - port: 8004
-    targetPort: 8004
+  - port: 80
+    targetPort: 8080
   type: ClusterIP
 ---
 # API Gateway
@@ -289,7 +289,7 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: api_gateway:local # Use local image for local deployment
+        image: api_gateway:local
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -315,7 +315,7 @@ spec:
               name: ecommerce-secrets
               key: JWT_SECRET
         ports:
-        - containerPort: 8000
+        - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -326,8 +326,8 @@ spec:
   selector:
     app: api-gateway
   ports:
-  - port: 8000
-    targetPort: 8000
+  - port: 80
+    targetPort: 8080
   type: ClusterIP
 ---
 # Frontend
@@ -349,7 +349,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: frontend:local # Use local image for local deployment
+        image: frontend:local
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -389,33 +389,6 @@ spec:
   - port: 80
     targetPort: 8080
   type: ClusterIP
----
-# Ingress
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ecommerce-ingress
-  namespace: ecommerce
-  annotations:
-    spec.ingressClassName: "nginx" # Use NGINX ingress for local deployment
-spec:
-  rules:
-  - http:
-      paths:
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: api-gateway
-            port:
-              number: 8000
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend
-            port:
-              number: 80
 ---
 # Added StatefulSet and Service for the shared database
 apiVersion: apps/v1
@@ -493,6 +466,13 @@ spec:
       containers:
       - name: kafka
         image: bitnami/kafka:latest
+        env:
+        - name: KAFKA_CFG_PROCESS_ROLES
+          value: "broker"
+        - name: KAFKA_CFG_NODE_ID
+          value: "1"
+        - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+          value: "PLAINTEXT:PLAINTEXT"
         ports:
         - containerPort: 9092
 ---

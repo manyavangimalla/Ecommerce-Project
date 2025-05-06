@@ -5,6 +5,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Set environment variable for unbuffered python output
+ENV PYTHONUNBUFFERED=1
+
 COPY . .
 
 ENV API_URL=http://api-gateway.ecommerce.svc.cluster.local
