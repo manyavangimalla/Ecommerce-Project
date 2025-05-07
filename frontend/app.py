@@ -125,8 +125,19 @@ def place_order():
             return redirect(url_for('cart'))
 
         # Prepare order data
+        items = []
+        for item_id in cart_items:
+            product = next((p for p in PRODUCTS if p['id'] == item_id), None)
+            if product:
+                items.append({
+                    'product_id': str(product['id']),  # Convert to string to match the expected format
+                    'product_name': product['name'],
+                    'price': product['price'],
+                    'quantity': 1
+                })
+
         order_data = {
-            'items': [{'product_id': item_id, 'quantity': 1} for item_id in cart_items],
+            'items': items,
             'shipping_address': request.form.get('shipping_address'),
             'payment_method': request.form.get('payment_method')
         }
@@ -234,6 +245,21 @@ def profile():
         return render_template('profile.html', user=user, orders=orders)
     except requests.exceptions.RequestException as e:
         flash('Failed to load profile. Please try again later.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/my_orders')
+@login_required
+def my_orders():
+    try:
+        response = requests.get(
+            f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/orders",
+            headers={'Authorization': f"Bearer {session.get('user_token')}"}
+        )
+        response.raise_for_status()
+        orders = response.json().get('items', [])
+        return render_template('my_orders.html', orders=orders)
+    except requests.exceptions.RequestException:
+        flash('Failed to load orders. Please try again later.', 'error')
         return redirect(url_for('index'))
 
 if __name__ == '__main__':

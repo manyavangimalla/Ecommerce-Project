@@ -7,7 +7,7 @@ metadata:
   labels:
     {{- include "ecommerce.labels" . | nindent 4 }}
   annotations:
-    kubernetes.io/ingress.class: "gce"  # Enable GKE ingress
+    # kubernetes.io/ingress.class: "gce"  # Enable GKE ingress
     networking.gke.io/managed-certificates: "ecommerce-cert"  # Use Google-managed certificate
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}

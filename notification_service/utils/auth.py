@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import request, jsonify, current_app as app
+from flask import request, jsonify, current_app
 import jwt
 
 def token_required(f):
@@ -13,7 +13,7 @@ def token_required(f):
             return jsonify({'message': 'Token is missing!'}), 401
         
         try:
-            data = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=["HS256"])
+            data = jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=["HS256"])
             current_user_id = data['user_id']
         except:
             return jsonify({'message': 'Token is invalid!'}), 401
@@ -21,3 +21,10 @@ def token_required(f):
         return f(current_user_id, *args, **kwargs)
     
     return decorated 
+
+# Middleware to log all incoming requests
+def log_request():
+    print(f"Incoming request: {request.method} {request.url}")
+    print(f"Headers: {dict(request.headers)}")
+    if request.data:
+        print(f"Body: {request.data.decode('utf-8')}") 

@@ -1,9 +1,9 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from models import db, User
 from flask_bcrypt import Bcrypt
 import jwt
 import datetime
-from utils.auth import token_required
+from utils.auth import token_required  # Import from local utils
 
 bcrypt = Bcrypt()
 
@@ -56,7 +56,7 @@ def login():
     token = jwt.encode({
         'user_id': user.id,
         'exp': datetime.datetime.utcnow() + datetime.timedelta(days=1)
-    }, app.config['JWT_SECRET_KEY'], algorithm="HS256")
+    }, current_app.config['JWT_SECRET_KEY'], algorithm="HS256")
     
     return jsonify({
         'token': token,

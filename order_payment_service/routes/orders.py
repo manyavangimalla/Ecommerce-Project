@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, Order, OrderItem
+from models import db, Order, OrderItem, Payment
 from utils.auth import token_required
 from utils.notifications import send_notification
 from utils.nats_client import publish_order_created_event
@@ -14,25 +14,31 @@ orders_blueprint = Blueprint('orders', __name__)
 @token_required
 def create_order(current_user_id):
     data = request.get_json()
+
     
+    print("\n\nShubham data", data)
     if not data or not data.get('items') or not data.get('shipping_address') or not data.get('payment_method'):
         return jsonify({'message': 'Missing required fields'}), 400
-    
-    # Validate inventory
-    items_to_check = [{'product_id': item['product_id'], 'quantity': item['quantity']} for item in data['items']]
-    try:
-        inventory_response = requests.post(
-            f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/inventory/check",
-            json={'items': items_to_check}
-        )
-        inventory_data = inventory_response.json()
         
-        # Check if all items are available
-        for item in inventory_data:
-            if not item['available']:
-                return jsonify({'message': item['message']}), 400
-    except:
-        return jsonify({'message': 'Error checking inventory'}), 500
+
+    # print("\n\n\nShubham new_order before hiting inventory \n\n", flush=True)
+    # print({os.environ.get('API_URL', 'http://localhost:5000')})
+
+    # Validate inventory
+    # items_to_check = [{'product_id': item['product_id'], 'quantity': item['quantity']} for item in data['items']]
+    # try:
+    #     inventory_response = requests.post(
+    #         f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/inventory/check",
+    #         json={'items': items_to_check}
+    #     )
+    #     inventory_data = inventory_response.json()
+        
+    #     # Check if all items are available
+    #     for item in inventory_data:
+    #         if not item['available']:
+    #             return jsonify({'message': item['message']}), 400
+    # except:
+    #     return jsonify({'message': 'Error checking inventory'}), 500
     
     # Calculate total amount
     total_amount = sum(item['price'] * item['quantity'] for item in data['items'])
@@ -46,6 +52,9 @@ def create_order(current_user_id):
         payment_method=data['payment_method']
     )
     
+    print("\n\n\nShubham new_order", new_order, flush=True)
+
+    # TODO fix commented code in this file
     # Add order items
     for item in data['items']:
         new_order.items.append(OrderItem(
@@ -56,6 +65,7 @@ def create_order(current_user_id):
         ))
     
     db.session.add(new_order)
+    db.session.commit()  # Commit to generate the order ID
     
     # Create payment record
     payment = Payment(
@@ -65,51 +75,51 @@ def create_order(current_user_id):
     )
     
     db.session.add(payment)
-    db.session.commit()
+    db.session.commit()  # Second commit to save the payment
     
     # Process payment
     # In a real application, this would integrate with a payment gateway like Stripe
-    payment_successful = True
+    # payment_successful = True
     
-    if payment_successful:
-        payment.status = 'completed'
-        payment.transaction_id = str(uuid.uuid4())  # This would be the transaction ID from the payment gateway
-        new_order.status = 'processing'
+    # if payment_successful:
+    #     payment.status = 'completed'
+    #     payment.transaction_id = str(uuid.uuid4())  # This would be the transaction ID from the payment gateway
+    #     new_order.status = 'processing'
         
-        # Update inventory
-        try:
-            requests.post(
-                f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/inventory/update",
-                headers={'Authorization': request.headers.get('Authorization')},
-                json={'items': [{'product_id': item['product_id'], 'quantity': item['quantity'], 'operation': 'decrease'} for item in data['items']]}
-            )
-        except:
-            # Log error, but don't fail the order
-            pass
+    #     # Update inventory
+    #     try:
+    #         requests.post(
+    #             f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/inventory/update",
+    #             headers={'Authorization': request.headers.get('Authorization')},
+    #             json={'items': [{'product_id': item['product_id'], 'quantity': item['quantity'], 'operation': 'decrease'} for item in data['items']]}
+    #         )
+    #     except:
+    #         # Log error, but don't fail the order
+    #         pass
         
-        # Send notification
-        send_notification(
-            current_user_id,
-            'order_placed',
-            {
-                'order_id': new_order.id,
-                'total_amount': total_amount,
-                'status': new_order.status
-            }
-        )
-        # Publish order_created event to NATS
-        order_event = {
-            'event_type': 'order_created',
-            'order_id': new_order.id,
-            'user_id': current_user_id,
-            'items': [{'product_id': item.product_id, 'quantity': item.quantity} for item in new_order.items]
-        }
-        asyncio.run(publish_order_created_event(order_event))
-    else:
-        payment.status = 'failed'
-        new_order.status = 'cancelled'
+    #     # Send notification
+    #     send_notification(
+    #         current_user_id,
+    #         'order_placed',
+    #         {
+    #             'order_id': new_order.id,
+    #             'total_amount': total_amount,
+    #             'status': new_order.status
+    #         }
+    #     )
+    #     # Publish order_created event to NATS
+    #     order_event = {
+    #         'event_type': 'order_created',
+    #         'order_id': new_order.id,
+    #         'user_id': current_user_id,
+    #         'items': [{'product_id': item.product_id, 'quantity': item.quantity} for item in new_order.items]
+    #     }
+    #     asyncio.run(publish_order_created_event(order_event))
+    # else:
+    #     payment.status = 'failed'
+    #     new_order.status = 'cancelled'
     
-    db.session.commit()
+    # db.session.commit()
     
     return jsonify({
         'order': new_order.to_dict(),

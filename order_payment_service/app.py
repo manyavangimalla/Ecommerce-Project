@@ -4,6 +4,7 @@ from routes.orders import orders_blueprint
 from routes.payments import payments_blueprint
 from routes.admin import admin_blueprint
 import os
+from extensions import db  # Import db from extensions
 
 app = Flask(__name__)
 
@@ -20,13 +21,18 @@ print(f"Connecting to database at {DATABASE_URL.replace(db_password, '******')}"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET')
 
 # Register blueprints
 app.register_blueprint(orders_blueprint, url_prefix='/api/orders')
 app.register_blueprint(payments_blueprint, url_prefix='/api/payments')
 app.register_blueprint(admin_blueprint, url_prefix='/api/admin')
 
+# Initialize db with the app
+with app.app_context():
+    db.init_app(app)
+
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(host='0.0.0.0', port=8080, debug=True)

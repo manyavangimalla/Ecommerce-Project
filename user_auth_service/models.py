@@ -1,11 +1,7 @@
-from flask_sqlalchemy import SQLAlchemy
+from extensions import db  # Import db from extensions instead of app
 import datetime
 import uuid
 
-# Initialize SQLAlchemy
-# This should be initialized in app.py and imported here
-
-db = SQLAlchemy()
 
 class User(db.Model):
     __tablename__ = 'shop_user'

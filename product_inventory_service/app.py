@@ -10,6 +10,8 @@ import redis
 from routes.products import products_blueprint
 from routes.categories import categories_blueprint
 from routes.inventory import inventory_blueprint
+from extensions import db  # Import db from extensions
+from models import Category, Product  # Import Category and Product models
 
 app = Flask(__name__)
 
@@ -29,8 +31,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Get JWT secret key from environment
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET', 'dev_secret_key')
 
-db = SQLAlchemy(app)
-
 # Redis connection for caching
 redis_client = redis.Redis(
     host=os.environ.get('REDIS_HOST', 'localhost'),
@@ -38,71 +38,6 @@ redis_client = redis.Redis(
     db=0,
     decode_responses=True
 )
-
-# Middleware to log all incoming requests
-@app.before_request
-def log_request():
-    print(f"Incoming request: {request.method} {request.url}")
-    print(f"Headers: {dict(request.headers)}")
-    if request.data:
-        print(f"Body: {request.data.decode('utf-8')}")
-
-# Models
-class Category(db.Model):
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = db.Column(db.String(100), nullable=False, unique=True)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name
-        }
-
-class Product(db.Model):
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    price = db.Column(db.Float, nullable=False)
-    stock = db.Column(db.Integer, nullable=False, default=0)
-    category_id = db.Column(db.String(36), db.ForeignKey('category.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-    
-    category = db.relationship('Category', backref=db.backref('products', lazy=True))
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'description': self.description,
-            'price': self.price,
-            'stock': self.stock,
-            'category': self.category.name,
-            'category_id': self.category_id,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
-        }
-
-# JWT token middleware
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = None
-        if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].split(" ")[1]
-        
-        if not token:
-            return jsonify({'message': 'Token is missing!'}), 401
-        
-        try:
-            data = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=["HS256"])
-            current_user_id = data['user_id']
-        except:
-            return jsonify({'message': 'Token is invalid!'}), 401
-            
-        return f(current_user_id, *args, **kwargs)
-    
-    return decorated
 
 # Admin middleware
 def admin_required(f):
@@ -128,7 +63,7 @@ if __name__ == '__main__':
     print("\n\n\nShubhammm \n\n\n")
     print(f"\n\nConnecting to database at {DATABASE_URL}")
     with app.app_context():
-        db.create_all()
+        db.init_app(app)
         
         # Add initial categories if none exist
         if not Category.query.first():

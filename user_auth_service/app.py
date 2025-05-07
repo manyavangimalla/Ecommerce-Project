@@ -8,6 +8,7 @@ from flask_bcrypt import Bcrypt
 from functools import wraps
 from routes.auth import auth_blueprint
 from routes.users import users_blueprint
+from extensions import db  # Import db from extensions
 
 app = Flask(__name__)
 
@@ -26,66 +27,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET')
 
-db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
-
-# Middleware to log all incoming requests
-@app.before_request
-def log_request():
-    print(f"Incoming request: {request.method} {request.url}", flush=True)
-    print(f"Headers: {dict(request.headers)}")
-    if request.data:
-        print(f"Body: {request.data.decode('utf-8')}")
-
-# User Model
-class User(db.Model):
-    __tablename__ = 'shop_user'
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    first_name = db.Column(db.String(100), nullable=False)
-    last_name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    
-    # User Address
-    address = db.Column(db.String(255))
-    city = db.Column(db.String(100))
-    state = db.Column(db.String(100))
-    zip_code = db.Column(db.String(20))
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'first_name': self.first_name,
-            'last_name': self.last_name,
-            'email': self.email,
-            'address': self.address,
-            'city': self.city,
-            'state': self.state,
-            'zip_code': self.zip_code,
-            'created_at': self.created_at.isoformat()
-        }
-
-# JWT token middleware
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = None
-        if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].split(" ")[1]
-        
-        if not token:
-            return jsonify({'message': 'Token is missing!'}), 401
-        
-        try:
-            data = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=["HS256"])
-            current_user = User.query.filter_by(id=data['user_id']).first()
-        except:
-            return jsonify({'message': 'Token is invalid!'}), 401
-            
-        return f(current_user, *args, **kwargs)
-    
-    return decorated
 
 # Register blueprints
 app.register_blueprint(auth_blueprint, url_prefix='/api/auth')
@@ -150,12 +92,10 @@ def login():
     }), 200
 
 @app.route('/api/users/me', methods=['GET'])
-@token_required
 def get_user_profile(current_user):
     return jsonify(current_user.to_dict()), 200
 
 @app.route('/api/users/me', methods=['PUT'])
-@token_required
 def update_user_profile(current_user):
     data = request.get_json()
     
@@ -177,7 +117,6 @@ def update_user_profile(current_user):
     return jsonify(current_user.to_dict()), 200
 
 @app.route('/api/users/me/password', methods=['PUT'])
-@token_required
 def change_password(current_user):
     data = request.get_json()
     
@@ -194,7 +133,6 @@ def change_password(current_user):
     return jsonify({'message': 'Password updated successfully'}), 200
 
 @app.route('/api/auth/validate', methods=['GET'])
-@token_required
 def validate_token(current_user):
     return jsonify({'message': 'Token is valid', 'user_id': current_user.id}), 200
 
@@ -206,9 +144,6 @@ def health_check():
 if __name__ == '__main__':
     print("Starting User Auth Service...")
     with app.app_context():
-        # Drop the old User table if it exists
-        if 'User' in db.metadata.tables:
-            db.metadata.tables['User'].drop(db.engine)
-        # Create all tables, including the new shop_user table
-        db.create_all()
+        db.init_app(app)  # Initialize db with the app
+        db.create_all()  # Create all tables
     app.run(host='0.0.0.0', port=8080, debug=True)

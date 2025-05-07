@@ -1,8 +1,6 @@
-from flask_sqlalchemy import SQLAlchemy
+from extensions import db  # Import db from extensions instead of app
 import datetime
 import uuid
-
-db = SQLAlchemy()
 
 class Order(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))

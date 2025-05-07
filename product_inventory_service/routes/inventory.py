@@ -7,6 +7,7 @@ inventory_blueprint = Blueprint('inventory', __name__)
 
 @inventory_blueprint.route('/check', methods=['POST'])
 def check_inventory():
+    print("\n\nShubham 1111", flush=True)
     data = request.get_json()
     
     if not data or not data.get('items'):
