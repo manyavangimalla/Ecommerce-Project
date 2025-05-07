@@ -6,6 +6,8 @@ import uuid
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from functools import wraps
+from routes.auth import auth_blueprint
+from routes.users import users_blueprint
 
 app = Flask(__name__)
 
@@ -84,6 +86,10 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
     
     return decorated
+
+# Register blueprints
+app.register_blueprint(auth_blueprint, url_prefix='/api/auth')
+app.register_blueprint(users_blueprint, url_prefix='/api/users')
 
 # Routes
 @app.route('/api/auth/register', methods=['POST'])
