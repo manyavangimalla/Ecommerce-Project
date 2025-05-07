@@ -37,9 +37,6 @@
                             {% endif %}
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('my_orders') }}">My Orders</a>
-                    </li>
                     {% if session.get('user_id') %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">

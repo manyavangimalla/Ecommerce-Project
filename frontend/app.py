@@ -242,25 +242,50 @@ def profile():
         orders_response.raise_for_status()
         orders = orders_response.json().get('items', [])
 
-        return render_template('profile.html', user=user, orders=orders)
+        # Fetch notification preferences
+        try:
+            pref_response = requests.get(f"{os.environ.get('API_URL')}/api/notifications/preferences", headers={'Authorization': f"Bearer {session.get('user_token')}"})
+            pref_response.raise_for_status()
+            preferences = pref_response.json() or {}
+        except Exception:
+            flash('Could not load notification preferences.', 'warning')
+            preferences = {}
+
+        # Ensure all expected keys exist
+        preferences = {
+            'email_notifications': preferences.get('email_notifications', False),
+            'sms_notifications': preferences.get('sms_notifications', False),
+            'app_notifications': preferences.get('app_notifications', True),
+            'email': preferences.get('email', user.get('email', '')),
+            'phone': preferences.get('phone', '')
+        }
+
+        return render_template('profile.html', user=user, orders=orders, preferences=preferences)
     except requests.exceptions.RequestException as e:
         flash('Failed to load profile. Please try again later.', 'error')
         return redirect(url_for('index'))
 
-@app.route('/my_orders')
+@app.route('/update_notification_preferences', methods=['POST'])
 @login_required
-def my_orders():
+def update_notification_preferences():
+    data = {
+        'email_notifications': bool(request.form.get('email_notifications')),
+        'sms_notifications': bool(request.form.get('sms_notifications')),
+        'app_notifications': bool(request.form.get('app_notifications')),
+        'email': request.form.get('email'),
+        'phone': request.form.get('phone')
+    }
     try:
-        response = requests.get(
-            f"{os.environ.get('API_URL', 'http://localhost:5000')}/api/orders",
-            headers={'Authorization': f"Bearer {session.get('user_token')}"}
+        response = requests.put(
+            f"{os.environ.get('API_URL')}/api/notifications/preferences",
+            headers={'Authorization': f"Bearer {session.get('user_token')}"},
+            json=data
         )
         response.raise_for_status()
-        orders = response.json().get('items', [])
-        return render_template('my_orders.html', orders=orders)
+        flash('Notification preferences updated!', 'success')
     except requests.exceptions.RequestException:
-        flash('Failed to load orders. Please try again later.', 'error')
-        return redirect(url_for('index'))
+        flash('Failed to update notification preferences.', 'error')
+    return redirect(url_for('profile'))
 
 if __name__ == '__main__':
     print("\n\nShubham Starting frontend app...")

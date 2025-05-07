@@ -1,12 +1,34 @@
 #!/bin/bash
 
 # This script sets up the entire application for local or cloud deployment.
-# Usage: ./setup-application.sh <build|deploy> <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]
+# Usage: ./setup-application.sh <build|deploy> [--force-rebuild] [--services=<service1,service2,...>]
 
-DEPLOY_ENV=$2
-if [ -z "$DEPLOY_ENV" ]; then
-  echo "Usage: $0 <build|deploy> <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]"
+# Prompt for deployment target if not provided
+if [ -z "$1" ] || { [ "$1" != "build" ] && [ "$1" != "deploy" ]; }; then
+  echo "Usage: $0 <build|deploy> [--force-rebuild] [--services=<service1,service2,...>]"
   exit 1
+fi
+
+# Prompt for environment if not provided
+if [ -z "$2" ]; then
+  echo "Select deployment target:"
+  echo "1) Local (Minikube)"
+  echo "2) Cloud (GCP)"
+  read -p "Enter choice [1-2]: " choice
+  case $choice in
+    1)
+      DEPLOY_ENV="local"
+      ;;
+    2)
+      DEPLOY_ENV="gcp"
+      ;;
+    *)
+      echo "Invalid choice. Exiting."
+      exit 1
+      ;;
+  esac
+else
+  DEPLOY_ENV=$2
 fi
 
 # Check for force rebuild flag
@@ -69,23 +91,16 @@ build_images() {
 # Step 2: Push Docker images to registry (for cloud deployment)
 push_images() {
   echo "Pushing Docker images to registry..."
-  CLOUD_REGISTRY="gcr.io/your-gcp-project-id"
-  services=("user_auth_service" "notification_service" "product_inventory_service" "order_payment_service" "api_gateway" "Frontend")
-  for service in "${services[@]}"; do
-    echo "Pushing $service to $CLOUD_REGISTRY..."
-    docker tag "$service:local" "$CLOUD_REGISTRY/$service:latest"
-    docker push "$CLOUD_REGISTRY/$service:latest"
-  done
+  # This will be handled by cloud/gcp.sh for GCP
 }
 
 # Step 3: Deploy using Helm
 deploy_with_helm() {
   echo "Deploying application using Helm..."
-  if [ "$DEPLOY_ENV" == "cloud" ]; then
-    helm upgrade --install ecommerce ./ecommerce \
-      --set image.registry="gcr.io/your-gcp-project-id" \
-      --set image.tag="latest" \
-      --namespace ecommerce
+  if [ "$DEPLOY_ENV" == "gcp" ]; then
+    # Call GCP-specific deployment script
+    ./cloud/gcp.sh "$1" "$DEPLOY_ENV" "${SERVICES[@]}" "$FORCE_REBUILD"
+    return
   elif [ "$DEPLOY_ENV" == "local" ]; then
     helm upgrade --install ecommerce ./ecommerce \
       --set image.registry="" \
@@ -117,28 +132,19 @@ update_configmap() {
 
 # Main script execution
 if [ "$1" == "build" ]; then
-  DEPLOY_ENV=$2
-  if [ -z "$DEPLOY_ENV" ]; then
-    echo "Usage: $0 build <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]"
-    exit 1
-  fi
   ensure_namespace
   configure_minikube_docker  # Ensure Minikube's Docker is used for local builds
   build_images
-  if [ "$DEPLOY_ENV" == "cloud" ]; then
-    push_images
+  if [ "$DEPLOY_ENV" == "gcp" ]; then
+    # Call GCP-specific build/push logic
+    ./cloud/gcp.sh build "$DEPLOY_ENV" "${SERVICES[@]}" "$FORCE_REBUILD"
   fi
 elif [ "$1" == "deploy" ]; then
-  DEPLOY_ENV=$2
-  if [ -z "$DEPLOY_ENV" ]; then
-    echo "Usage: $0 deploy <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]"
-    exit 1
-  fi
   ensure_namespace
   update_configmap
-  deploy_with_helm
+  deploy_with_helm "$1"
 else
-  echo "Invalid command. Usage: $0 <build|deploy> <local|cloud> [--force-rebuild] [--services=<service1,service2,...>]"
+  echo "Invalid command. Usage: $0 <build|deploy> [--force-rebuild] [--services=<service1,service2,...>]"
   exit 1
 fi
 

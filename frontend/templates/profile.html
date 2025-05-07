@@ -65,4 +65,39 @@
         </div>
     </div>
 </div>
+<!-- Notification Preferences Section -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Notification Preferences</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_notification_preferences') }}">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="email_notifications" id="email_notifications" {% if preferences.email_notifications %}checked{% endif %}>
+                        <label class="form-check-label" for="email_notifications">Email Notifications</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="sms_notifications" id="sms_notifications" {% if preferences.sms_notifications %}checked{% endif %}>
+                        <label class="form-check-label" for="sms_notifications">SMS Notifications</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="app_notifications" id="app_notifications" {% if preferences.app_notifications %}checked{% endif %}>
+                        <label class="form-check-label" for="app_notifications">In-App Notifications</label>
+                    </div>
+                    <div class="mb-3 mt-2">
+                        <label for="email" class="form-label">Notification Email</label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ preferences.email or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Phone Number (for SMS)</label>
+                        <input type="text" class="form-control" id="phone" name="phone" value="{{ preferences.phone or '' }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Preferences</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

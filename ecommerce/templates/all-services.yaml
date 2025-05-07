@@ -49,7 +49,7 @@ spec:
     spec:
       containers:
       - name: user-auth-service
-        image: user_auth_service:local
+        image: {{ trimPrefix "/" (printf "%s/%s:%s" .Values.image.registry .Values.image.repository.userAuthService .Values.image.tag) }}
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -109,7 +109,7 @@ spec:
     spec:
       containers:
       - name: product-inventory-service
-        image: product_inventory_service:local
+        image: {{ trimPrefix "/" (printf "%s/%s:%s" .Values.image.registry .Values.image.repository.productInventoryService .Values.image.tag) }}
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -169,7 +169,7 @@ spec:
     spec:
       containers:
       - name: order-payment-service
-        image: order_payment_service:local
+        image: {{ trimPrefix "/" (printf "%s/%s:%s" .Values.image.registry .Values.image.repository.orderPaymentService .Values.image.tag) }}
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -229,7 +229,7 @@ spec:
     spec:
       containers:
       - name: notification-service
-        image: notification_service:local
+        image: {{ trimPrefix "/" (printf "%s/%s:%s" .Values.image.registry .Values.image.repository.notificationService .Values.image.tag) }}
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -289,7 +289,7 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: api_gateway:local
+        image: {{ trimPrefix "/" (printf "%s/%s:%s" .Values.image.registry .Values.image.repository.apiGateway .Values.image.tag) }}
         env:
         - name: DEPLOY_ENV
           valueFrom:
@@ -349,7 +349,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: frontend:local
+        image: {{ trimPrefix "/" (printf "%s/%s:%s" .Values.image.registry .Values.image.repository.frontend .Values.image.tag) }}
         env:
         - name: DEPLOY_ENV
           valueFrom:

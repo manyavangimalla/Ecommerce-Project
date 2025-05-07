@@ -16,6 +16,7 @@ import asyncio
 from routes.notifications import notifications_blueprint
 from extensions import db  # Import db from extensions
 from models import Notification, UserNotificationPreference  # Import Notification and UserNotificationPreference models
+from utils.notifications import send_notification
 
 app = Flask(__name__)
 
@@ -48,6 +49,11 @@ with app.app_context():
 # NATS subscriber configuration
 nats_client = NATS()
 
+# Wrapper to ensure app context in thread
+def send_notification_with_context(user_id, notification_type, data):
+    with app.app_context():
+        send_notification(user_id, notification_type, data)
+
 async def run(loop):
     print("\n\n Shubham starting nats client \n\n", flush=True)
     await nats_client.connect(servers=["nats://nats:4222"])
@@ -55,14 +61,17 @@ async def run(loop):
     
     async def message_handler(msg):
         event = json.loads(msg.data.decode('utf-8'))
-        print(f"Received event: {event}")
 
         if event['event_type'] == 'order_created':
-            # For now, just print the event
-            print(f"\n\nShubham Order placed event received: {event}", flush=True)
+            print(f"\n\nShubham Order placed sending notification: {event}", flush=True)
+            user_id = event['user_id']
+            order_id = event['order_id']
+            threading.Thread(target=send_notification_with_context, args=(user_id, 'order_placed', {
+                'order_id': order_id,
+                'items': event['items']
+            })).start()
 
     await nats_client.subscribe("order_created", cb=message_handler)
-    print("\n\n Shubham subscribed to 'order_created' subject \n\n", flush=True)
     while True:
         await asyncio.sleep(1)  # Keep the listener alive
 

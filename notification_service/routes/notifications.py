@@ -130,6 +130,8 @@ def get_notification_preferences(current_user_id):
 def update_notification_preferences(current_user_id):
     data = request.get_json()
     
+    print("\n\n Shubham updating notification preferences \n\n", flush=True)
+    print(data, flush=True)
     preferences = UserNotificationPreference.query.filter_by(user_id=current_user_id).first()
     
     if not preferences:
