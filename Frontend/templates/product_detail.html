@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ product.name }} - ShopEasy{% endblock %}
+{% block title %}{{ product.name }} - ElectroCart{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -9,12 +9,18 @@
             <img src="{{ url_for('static', filename='images/' + product.image) }}"
                  alt="{{ product.name }}"
                  class="img-fluid rounded"
-                 style="max-height: 300px;" />
+                 style="max-height: 300px;" 
+                 id="product-image" />
         </div>
     </div>
     <div class="col-md-6">
-        <h1>{{ product.name }}</h1>
-        <p class="text-primary fw-bold fs-3">${{ product.price }}</p>
+        <div class="d-flex justify-content-between align-items-start">
+            <h1 id="product-name">{{ product.name }}</h1>
+            <button id="wishlist-btn" class="btn btn-outline-secondary ms-2" title="Add to Wishlist">
+                <i class="fas fa-heart" id="wishlist-icon"></i>
+            </button>
+        </div>
+        <p class="text-primary fw-bold fs-3" id="product-price">${{ product.price }}</p>
         <p>{{ product.description }}</p>
         <p>
             <span class="badge {% if product.stock > 10 %}bg-success{% elif product.stock > 0 %}bg-warning{% else %}bg-danger{% endif %}">
@@ -23,13 +29,13 @@
             <span class="ms-2">Category: {{ product.category }}</span>
         </p>
         
-        <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="post">
-            <div class="mb-3">
+        <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="post" class="d-flex align-items-end">
+            <div class="mb-3 me-2">
                 <label for="quantity" class="form-label">Quantity:</label>
                 <input type="number" class="form-control" id="quantity" name="quantity" value="1" min="1" max="{{ product.stock }}" style="width: 100px;">
             </div>
             <button type="submit" class="btn btn-primary" {% if product.stock <= 0 %}disabled{% endif %}>
-                Add to Cart
+                <i class="fas fa-shopping-cart me-1"></i> Add to Cart
             </button>
         </form>
         
@@ -39,7 +45,7 @@
                 <tbody>
                     <tr>
                         <th>ID</th>
-                        <td>{{ product.id }}</td>
+                        <td id="product-id">{{ product.id }}</td>
                     </tr>
                     <tr>
                         <th>Category</th>
@@ -68,11 +74,248 @@
                 <div class="card-body">
                     <h5 class="card-title">{{ rp.name }}</h5>
                     <p class="card-text text-primary fw-bold">${{ rp.price }}</p>
-                    <a href="{{ url_for('product_detail', product_id=rp.id) }}" class="btn btn-outline-primary">View Details</a>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('product_detail', product_id=rp.id) }}" class="btn btn-outline-primary">View Details</a>
+                        <button class="btn btn-outline-secondary related-wishlist-btn" 
+                                data-product-id="{{ rp.id }}"
+                                data-product-name="{{ rp.name }}"
+                                data-product-price="{{ rp.price }}"
+                                data-product-image="{{ url_for('static', filename='images/' ~ rp.image) }}">
+                            <i class="fas fa-heart"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             {% endfor %}
-        
+        </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const productId = document.getElementById('product-id').textContent.trim();
+        const wishlistButton = document.getElementById('wishlist-btn');
+        const wishlistIcon = document.getElementById('wishlist-icon');
+        
+        console.log("Product ID:", productId);
+        
+        // Check if product is in wishlist
+        checkWishlistStatus(productId);
+        
+        // Add wishlist toggle functionality
+        wishlistButton.addEventListener('click', function() {
+            toggleWishlist(productId);
+        });
+        
+        // Add event listeners for related products wishlist buttons
+        document.querySelectorAll('.related-wishlist-btn').forEach(button => {
+            const relatedProductId = button.getAttribute('data-product-id');
+            checkWishlistStatus(relatedProductId, button.querySelector('i'), button);
+            
+            button.addEventListener('click', function() {
+                const relatedProductId = this.getAttribute('data-product-id');
+                const relatedProductName = this.getAttribute('data-product-name');
+                const relatedProductPrice = this.getAttribute('data-product-price');
+                const relatedProductImage = this.getAttribute('data-product-image');
+                
+                toggleWishlist(
+                    relatedProductId, 
+                    this.querySelector('i'), 
+                    this, 
+                    relatedProductName, 
+                    relatedProductPrice, 
+                    relatedProductImage
+                );
+            });
+        });
+        
+        async function checkWishlistStatus(productId, iconElement = wishlistIcon, buttonElement = wishlistButton) {
+            try {
+                console.log("Checking wishlist status for product ID:", productId);
+                const response = await fetch(`/api/wishlist/check/${productId}`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to check wishlist status');
+                }
+                
+                const data = await response.json();
+                console.log("Wishlist status:", data);
+                
+                // Update button appearance based on wishlist status
+                if (data.in_wishlist) {
+                    buttonElement.classList.add('active');
+                    buttonElement.classList.remove('btn-outline-secondary');
+                    buttonElement.classList.add('btn-danger');
+                    iconElement.classList.add('text-white');
+                } else {
+                    buttonElement.classList.remove('active');
+                    buttonElement.classList.add('btn-outline-secondary');
+                    buttonElement.classList.remove('btn-danger');
+                    iconElement.classList.remove('text-white');
+                }
+                
+            } catch (error) {
+                console.error('Error checking wishlist status:', error);
+            }
+        }
+        
+        async function toggleWishlist(
+    productId, 
+    iconElement = wishlistIcon, 
+    buttonElement = wishlistButton, 
+    productName = null, 
+    productPrice = null, 
+    productImage = null
+) {
+    try {
+        console.log("Toggle wishlist for product ID:", productId);
+        
+        // Check if product is already in wishlist
+        const checkResponse = await fetch(`/api/wishlist/check/${productId}`);
+        
+        if (!checkResponse.ok) {
+            throw new Error('Failed to check wishlist status');
+        }
+        
+        const checkData = await checkResponse.json();
+        console.log("Wishlist check response:", checkData);
+        
+        if (checkData.in_wishlist) {
+            // Find the wishlist item ID first
+            const wishlistResponse = await fetch('/api/wishlist');
+            
+            if (!wishlistResponse.ok) {
+                throw new Error('Failed to get wishlist items');
+            }
+            
+            const wishlistItems = await wishlistResponse.json();
+            console.log("All wishlist items:", wishlistItems);
+            
+            // Convert to string for comparison if needed
+            const productIdStr = String(productId);
+            const wishlistItem = wishlistItems.find(item => String(item.product_id) === productIdStr);
+            
+            if (!wishlistItem) {
+                throw new Error('Wishlist item not found');
+            }
+            
+            console.log("Found wishlist item to remove:", wishlistItem);
+            
+            // Remove from wishlist
+            const removeResponse = await fetch(`/api/wishlist/${wishlistItem.id}`, {
+                method: 'DELETE'
+            });
+            
+            if (!removeResponse.ok) {
+                throw new Error('Failed to remove from wishlist');
+            }
+            
+            buttonElement.classList.remove('active');
+            buttonElement.classList.add('btn-outline-secondary');
+            buttonElement.classList.remove('btn-danger');
+            iconElement.classList.remove('text-white');
+            
+            // Show feedback
+            showToast('Item removed from wishlist');
+            
+        } else {
+            // Get product details if not provided (main product)
+            if (!productName) {
+                productName = document.getElementById('product-name').textContent.trim();
+            }
+            if (!productPrice) {
+                productPrice = document.getElementById('product-price').textContent.trim().replace('$', '');
+            }
+            if (!productImage) {
+                productImage = document.getElementById('product-image').src;
+            }
+            
+            console.log("Adding to wishlist:", {
+                product_id: productId,
+                product_name: productName,
+                product_price: parseFloat(productPrice),
+                product_image: productImage
+            });
+            
+            // Add to wishlist
+            const addResponse = await fetch('/api/wishlist', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    product_id: productId,
+                    product_name: productName,
+                    product_price: parseFloat(productPrice),
+                    product_image: productImage
+                })
+            });
+            
+            if (!addResponse.ok) {
+                const errorText = await addResponse.text();
+                throw new Error(`Failed to add to wishlist: ${errorText}`);
+            }
+            
+            buttonElement.classList.add('active');
+            buttonElement.classList.remove('btn-outline-secondary');
+            buttonElement.classList.add('btn-danger');
+            iconElement.classList.add('text-white');
+            
+            // Show feedback
+            showToast('Item added to wishlist');
+        }
+        
+    } catch (error) {
+        console.error('Error toggling wishlist:', error);
+        showToast('Failed to update wishlist: ' + error.message, 'error');
+    }
+}
+        function showToast(message, type = 'success') {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.getElementById('toast-container');
+            
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+                toastContainer.style.zIndex = '1050';
+                document.body.appendChild(toastContainer);
+            }
+            
+            // Create toast element with unique ID
+            const toastId = 'toast-' + Date.now();
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = `toast ${type === 'error' ? 'bg-danger text-white' : 'bg-success text-white'}`;
+            toast.role = 'alert';
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            
+            toast.innerHTML = `
+                <div class="toast-header bg-${type === 'error' ? 'danger' : 'success'} text-white">
+                    <strong class="me-auto">Notification</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            // Initialize Bootstrap toast
+            const bsToast = new bootstrap.Toast(toast, {
+                autohide: true,
+                delay: 3000
+            });
+            
+            bsToast.show();
+            
+            // Remove toast after it's hidden
+            toast.addEventListener('hidden.bs.toast', function() {
+                toast.remove();
+            });
+        }
+    });
+</script>
 {% endblock %}

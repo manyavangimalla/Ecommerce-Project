@@ -1,34 +1,51 @@
 {% extends 'base.html' %}
 
-{% block title %}Profile - ShopEasy{% endblock %}
+{% block title %}Profile - ElectroCart{% endblock %}
 
 {% block content %}
-<h1 class="mb-4">My Profile</h1>
+<h1 class="mb-4"><i class="fas fa-user-circle me-2"></i>My Profile</h1>
 
 <div class="row">
     <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Account Information</h5>
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-id-card me-2"></i>Account Information</h5>
             </div>
             <div class="card-body">
-                <p><strong>Name:</strong> {{ user.name }}</p>
-                <p><strong>Email:</strong> {{ user.email }}</p>
-                <p><strong>Address:</strong> {{ user.address }}</p>
-                <a href="#" class="btn btn-outline-primary">Edit Profile</a>
+                <p><strong><i class="fas fa-user me-2"></i>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+                <p><strong><i class="fas fa-envelope me-2"></i>Email:</strong> {{ user.email }}</p>
+                <p><strong><i class="fas fa-map-marker-alt me-2"></i>Address:</strong> {% if user.address %}{{ user.address }}{% else %}Not provided{% endif %}</p>
+                <a href="#" class="btn btn-outline-primary">
+                    <i class="fas fa-pencil-alt me-2"></i>Edit Profile
+                </a>
+            </div>
+        </div>
+        
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Account Security</h5>
+            </div>
+            <div class="card-body">
+                <p><i class="fas fa-lock me-2"></i>Password: ********</p>
+                <a href="#" class="btn btn-outline-primary">
+                    <i class="fas fa-key me-2"></i>Change Password
+                </a>
             </div>
         </div>
     </div>
     
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Order History</h5>
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-box me-2"></i>Recent Orders</h5>
+                <a href="{{ url_for('order_history') }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-list me-1"></i>View All Orders
+                </a>
             </div>
             <div class="card-body">
                 {% if orders %}
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table table-hover">
                         <thead>
                             <tr>
                                 <th>Order ID</th>
@@ -45,12 +62,29 @@
                                 <td>{{ order.date }}</td>
                                 <td>${{ order.total }}</td>
                                 <td>
-                                    <span class="badge {% if order.status == 'Delivered' %}bg-success{% elif order.status == 'Processing' %}bg-warning{% else %}bg-info{% endif %}">
-                                        {{ order.status }}
-                                    </span>
+                                    {% if order.status == 'Delivered' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>{{ order.status }}
+                                        </span>
+                                    {% elif order.status == 'Processing' %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-cog me-1"></i>{{ order.status }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-truck me-1"></i>{{ order.status }}
+                                        </span>
+                                    {% endif %}
                                 </td>
                                 <td>
-                                    <a href="#" class="btn btn-sm btn-outline-primary">View</a>
+                                    <a href="{{ url_for('order_details', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye me-1"></i>View
+                                    </a>
+                                    {% if order.status == 'Processing' or order.status == 'Shipped' %}
+                                        <a href="{{ url_for('track_order', order_id=order.id) }}" class="btn btn-sm btn-outline-info">
+                                            <i class="fas fa-truck me-1"></i>Track
+                                        </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -58,9 +92,32 @@
                     </table>
                 </div>
                 {% else %}
-                <p>You haven't placed any orders yet.</p>
-                <a href="{{ url_for('products') }}" class="btn btn-primary">Start Shopping</a>
+                <div class="text-center py-4">
+                    <i class="fas fa-shopping-bag mb-3" style="font-size: 3rem; color: #ccc;"></i>
+                    <h5>You haven't placed any orders yet</h5>
+                    <p class="text-muted">When you place an order, it will appear here.</p>
+                    <a href="{{ url_for('products') }}" class="btn btn-primary mt-2">
+                        <i class="fas fa-shopping-cart me-2"></i>Start Shopping
+                    </a>
+                </div>
                 {% endif %}
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-heart me-2"></i>Recently Viewed Products</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- This would show recently viewed products if you track them -->
+                    <div class="col-12 text-center py-3">
+                        <p class="text-muted">Browse products to see your recently viewed items here.</p>
+                        <a href="{{ url_for('products') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-search me-2"></i>Browse Products
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

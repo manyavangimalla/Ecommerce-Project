@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}My Wishlist - ElectroCart{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <h1 class="mb-4">My Wishlist</h1>
+    
+    <div id="wishlist-items" class="row">
+        <!-- Items will be loaded here -->
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Loading your wishlist...</p>
+        </div>
+    </div>
+    
+    <!-- Empty wishlist message (hidden by default) -->
+    <div id="empty-wishlist" class="text-center py-5" style="display: none;">
+        <i class="fas fa-heart fa-4x text-muted mb-3"></i>
+        <h3>Your wishlist is empty</h3>
+        <p class="text-muted">Add items to your wishlist to keep track of products you're interested in.</p>
+        <a href="{{ url_for('products') }}" class="btn btn-primary mt-3">Browse Products</a>
+    </div>
+    
+    <!-- Error message (hidden by default) -->
+    <div id="error-container" class="alert alert-danger my-4" style="display: none;">
+        Failed to load wishlist. Please try again later.
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadWishlist();
+    
+    // Handle wishlist item removal
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-from-wishlist') || 
+            e.target.closest('.remove-from-wishlist')) {
+            const button = e.target.classList.contains('remove-from-wishlist') ? 
+                e.target : e.target.closest('.remove-from-wishlist');
+            const itemId = button.getAttribute('data-id');
+            removeFromWishlist(itemId);
+        }
+    });
+});
+
+// Modified fetchWishlist function:
+async function loadWishlist() {
+    try {
+        console.log("Fetching wishlist data...");
+        const response = await fetch('/api/wishlist');
+        
+        if (!response.ok) {
+            console.error("API error:", response.status, response.statusText);
+            throw new Error('Failed to load wishlist');
+        }
+        
+        const wishlistItems = await response.json();
+        console.log("Wishlist items:", wishlistItems);
+        displayWishlistItems(wishlistItems);
+        
+    } catch (error) {
+        console.error('Error loading wishlist:', error);
+        document.getElementById('wishlist-items').style.display = 'none';
+        
+        const errorContainer = document.getElementById('error-container');
+        errorContainer.style.display = 'block';
+        errorContainer.textContent = `Failed to load wishlist: ${error.message}`;
+    }
+}
+
+function displayWishlistItems(items) {
+    const container = document.getElementById('wishlist-items');
+    const emptyMessage = document.getElementById('empty-wishlist');
+    const errorContainer = document.getElementById('error-container');
+    
+    // Hide error container (if visible)
+    errorContainer.style.display = 'none';
+    
+    if (items.length === 0) {
+        // Show empty state
+        container.style.display = 'none';
+        emptyMessage.style.display = 'block';
+        return;
+    }
+    
+    // Hide empty message and show items
+    container.style.display = 'flex';
+    emptyMessage.style.display = 'none';
+    
+    // Display wishlist items
+    container.innerHTML = items.map(item => `
+        <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+            <div class="card h-100">
+                <img src="${item.product_image || '/static/placeholder.jpg'}" 
+                     alt="${item.product_name}" 
+                     class="card-img-top" 
+                     style="height: 200px; object-fit: contain; padding: 15px;">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">${item.product_name}</h5>
+                    <p class="card-text text-primary fw-bold">$${parseFloat(item.product_price).toFixed(2)}</p>
+                    <div class="mt-auto pt-3 d-flex justify-content-between">
+                        <a href="/product/${item.product_id}" class="btn btn-outline-primary">View Details</a>
+                        <button class="btn btn-outline-danger remove-from-wishlist" data-id="${item.id}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                    <form action="/add_to_cart/${item.product_id}" 
+                          method="POST" 
+                          class="mt-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-shopping-cart me-1"></i> Add to Cart
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+async function removeFromWishlist(itemId) {
+    try {
+        console.log("Removing item from wishlist with ID:", itemId);
+        
+        const response = await fetch(`/api/wishlist/${itemId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        let responseData;
+        try {
+            // Try to get JSON response
+            responseData = await response.json();
+            console.log("Response data:", responseData);
+        } catch (e) {
+            // If not JSON, get text response
+            const text = await response.text();
+            console.log("Response text:", text);
+            responseData = { message: text || 'Unknown error' };
+        }
+        
+        if (!response.ok) {
+            throw new Error(responseData.message || `Status ${response.status}: ${response.statusText}`);
+        }
+        
+        // Success - show message and reload
+        console.log("Successfully removed item");
+        alert('Item removed from wishlist successfully');
+        
+        // Reload wishlist items
+        loadWishlist();
+        
+    } catch (error) {
+        console.error('Error removing from wishlist:', error);
+        alert(`Failed to remove item: ${error.message}`);
+    }
+}
+</script>
+{% endblock %}

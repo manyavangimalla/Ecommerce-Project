@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Order Details - ElectroCart{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <h1>Order Details</h1>
+        <a href="{{ url_for('order_history') }}" class="btn btn-outline-secondary">Back to Orders</a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Order #{{ order.id }}</h5>
+                <span class="badge 
+                    {% if order.status == 'Delivered' %}bg-success
+                    {% elif order.status == 'Shipped' %}bg-info
+                    {% elif order.status == 'Processing' %}bg-warning
+                    {% else %}bg-secondary{% endif %}">
+                    {{ order.status }}
+                </span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Order Information</h5>
+                    <table class="table table-borderless">
+                        <tr>
+                            <th class="ps-0">Order Date:</th>
+                            <td>{{ order.date }}</td>
+                        </tr>
+                        <tr>
+                            <th class="ps-0">Status:</th>
+                            <td>{{ order.status }}</td>
+                        </tr>
+                        <tr>
+                            <th class="ps-0">Total:</th>
+                            <td>${{ "%.2f"|format(order.total) }}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                {% if order.shipping_address is defined %}
+                <div class="col-md-6">
+                    <h5>Shipping Address</h5>
+                    <p>{{ order.shipping_address }}</p>
+                    
+                    {% if order.status != 'Delivered' %}
+                    <a href="{{ url_for('track_order', order_id=order.id) }}" class="btn btn-info">
+                        <i class="fas fa-truck me-2"></i>Track Order
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <h3 class="mb-3">Order Items</h3>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>Product</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                    <th class="text-end">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if order.items is defined and order.items is iterable %}
+                    {% for item in order.items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>${{ "%.2f"|format(item.price) }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td class="text-end">${{ "%.2f"|format(item.price * item.quantity) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center">No item details available</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                    <td class="text-end">${{ "%.2f"|format(order.total) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div class="mt-4">
+        <a href="{{ url_for('order_history') }}" class="btn btn-outline-secondary">Back to Orders</a>
+        
+        {% if order.status != 'Delivered' %}
+        <a href="{{ url_for('track_order', order_id=order.id) }}" class="btn btn-info">
+            <i class="fas fa-truck me-2"></i>Track Order
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

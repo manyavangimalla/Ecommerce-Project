@@ -5,7 +5,107 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ElectroCart - Distributed E-Commerce{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Custom navbar styling */
+        .navbar {
+            background-color: #212529 !important;
+            padding: 15px 0;
+        }
+        
+        .navbar-brand {
+            color: white !important;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .navbar .nav-link {
+            color: rgba(255, 255, 255, 0.75) !important;
+            font-size: 16px;
+            padding: 8px 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .navbar .nav-link:hover {
+            color: white !important;
+        }
+        
+        .navbar .nav-link i, 
+        .navbar .nav-link svg {
+            margin-right: 8px;
+        }
+        
+        .navbar .search-form {
+            width: 300px;
+        }
+        
+        .navbar .search-form .input-group {
+            background-color: #2c3136;
+            border-radius: 4px;
+        }
+        
+        .navbar .search-form input {
+            background-color: transparent;
+            border: none;
+            color: white;
+        }
+        
+        .navbar .search-form input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .navbar .search-form input:focus {
+            box-shadow: none;
+            background-color: transparent;
+        }
+        
+        .navbar .search-form .btn {
+            background-color: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .navbar .search-form .btn:hover {
+            color: white;
+        }
+        
+        .navbar .badge {
+            margin-left: 5px;
+        }
+        
+        .navbar .dropdown-menu {
+            background-color: #2c3136;
+            border: none;
+            margin-top: 10px;
+        }
+        
+        .navbar .dropdown-item {
+            color: rgba(255, 255, 255, 0.75);
+        }
+        
+        .navbar .dropdown-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .navbar .dropdown-divider {
+            border-top-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Make sure content isn't under navbar */
+        main {
+            padding-top: 20px;
+        }
+        
+        @media (max-width: 992px) {
+            .navbar .search-form {
+                width: 100%;
+                margin: 10px 0;
+            }
+        }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -18,50 +118,86 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home"></i> Home
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('products') }}">Products</a>
+                        <a class="nav-link" href="{{ url_for('products') }}">
+                            <i class="fas fa-shopping-bag"></i> Products
+                        </a>
                     </li>
                 </ul>
-                <form class="d-flex me-2" action="{{ url_for('products') }}" method="get">
-                    <input class="form-control me-2" type="search" name="search" placeholder="Search...">
-                    <button class="btn btn-light" type="submit">Search</button>
+                
+                <!-- Search Form -->
+                <form class="search-form mx-lg-auto" action="{{ url_for('products') }}" method="get">
+                    <div class="input-group">
+                        <input class="form-control" type="search" name="search" placeholder="Search...">
+                        <button class="btn" type="submit">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
                 </form>
-                <ul class="navbar-nav">
+                
+                <ul class="navbar-nav ms-auto">
+                    {% if session.get('user_id') %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('wishlist_page') }}">
+                            <i class="fas fa-heart"></i> Wishlist
+                        </a>
+                    </li>
+                    {% endif %}
+                    
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('cart') }}">
-                            Cart 
+                            <i class="fas fa-shopping-cart"></i> Cart 
                             {% if session.get('cart') %}
                                 <span class="badge bg-danger">{{ session.get('cart')|length }}</span>
                             {% endif %}
                         </a>
                     </li>
+                    
                     {% if session.get('user_id') %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                                {{ session.get('user_email') }}
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="{{ url_for('profile') }}">Profile</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
-                            </ul>
-                        </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user"></i>
+                            {% if session.get('user_email') %}
+                                {{ session.get('user_email').split('@')[0] }}
+                            {% else %}
+                                User
+                            {% endif %}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('profile') }}">
+                                <i class="fas fa-user-circle me-2"></i> My Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('order_history') }}">
+                                <i class="fas fa-box me-2"></i> My Orders
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
                     {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('login') }}">Login</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('register') }}">Register</a>
-                        </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('register') }}">
+                            <i class="fas fa-user-plus"></i> Register
+                        </a>
+                    </li>
                     {% endif %}
                 </ul>
             </div>
         </div>
     </nav>
     
-    <div class="container mt-4">
+    <main class="container mt-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -73,14 +209,14 @@
         {% endwith %}
         
         {% block content %}{% endblock %}
-    </div>
+    </main>
     
     <footer class="bg-dark text-light mt-5 py-4">
         <div class="container">
             <div class="row">
                 <div class="col-md-4">
-                    <h5>ShopEasy</h5>
-                    <p>Your one-stop shop for all your needs.</p>
+                    <h5>ElectroCart</h5>
+                    <p>Your one-stop shop for all your electronics needs.</p>
                 </div>
                 <div class="col-md-4">
                     <h5>Quick Links</h5>
@@ -96,13 +232,13 @@
                     <address>
                         123 E-commerce St<br>
                         Digital City, DC 10101<br>
-                        <a href="mailto:info@shopeasy.com" class="text-light">info@shopeasy.com</a>
+                        <a href="mailto:info@electrocart.com" class="text-light">info@electrocart.com</a>
                     </address>
                 </div>
             </div>
             <div class="row mt-3">
                 <div class="col-12 text-center">
-                    <p class="mb-0">&copy; 2025 ShopEasy. All rights reserved.</p>
+                    <p class="mb-0">&copy; 2025 ElectroCart. All rights reserved.</p>
                 </div>
             </div>
         </div>
