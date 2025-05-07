@@ -447,46 +447,39 @@ spec:
   selector:
     app: ecommerce-db
 ---
-# Kafka Deployment
+# NATS Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kafka
+  name: nats
   namespace: ecommerce
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kafka
+      app: nats
   template:
     metadata:
       labels:
-        app: kafka
+        app: nats
     spec:
       containers:
-      - name: kafka
-        image: bitnami/kafka:latest
-        env:
-        - name: KAFKA_CFG_PROCESS_ROLES
-          value: "broker"
-        - name: KAFKA_CFG_NODE_ID
-          value: "1"
-        - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
-          value: "PLAINTEXT:PLAINTEXT"
+      - name: nats
+        image: nats:latest
         ports:
-        - containerPort: 9092
+        - containerPort: 4222
 ---
-# Kafka Service
+# NATS Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: kafka
+  name: nats
   namespace: ecommerce
 spec:
   selector:
-    app: kafka
+    app: nats
   ports:
   - name: client
-    port: 9092
-    targetPort: 9092
+    port: 4222
+    targetPort: 4222
   type: ClusterIP

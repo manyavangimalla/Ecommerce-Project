@@ -126,7 +126,7 @@ def place_order():
 
         # Prepare order data
         order_data = {
-            'items': [{'product_id': item_id} for item_id in cart_items],
+            'items': [{'product_id': item_id, 'quantity': 1} for item_id in cart_items],
             'shipping_address': request.form.get('shipping_address'),
             'payment_method': request.form.get('payment_method')
         }

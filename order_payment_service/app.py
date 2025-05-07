@@ -8,6 +8,8 @@ import jwt
 from functools import wraps
 import json
 from confluent_kafka import Producer
+from nats.aio.client import NATS
+import asyncio
 
 app = Flask(__name__)
 
@@ -32,14 +34,13 @@ NOTIFICATION_SERVICE_URL = os.environ.get('NOTIFICATION_SERVICE_URL', 'http://no
 
 db = SQLAlchemy(app)
 
-# Kafka producer configuration
-kafka_producer = Producer({'bootstrap.servers': 'kafka:9092'})
+# NATS publisher configuration
+nats_client = NATS()
 
-def delivery_report(err, msg):
-    if err is not None:
-        print(f"Delivery failed for record {msg.key()}: {err}")
-    else:
-        print(f"Record successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
+async def publish_order_created_event(order_event):
+    await nats_client.connect(servers=["nats://nats:4222"])
+    await nats_client.publish("order_created", json.dumps(order_event).encode('utf-8'))
+    await nats_client.close()
 
 # Middleware to log all incoming requests
 @app.before_request
@@ -241,26 +242,19 @@ def create_order(current_user_id):
                 'status': new_order.status
             }
         )
+        # Publish order_created event to NATS
+        order_event = {
+            'event_type': 'order_created',
+            'order_id': new_order.id,
+            'user_id': current_user_id,
+            'items': [{'product_id': item.product_id, 'quantity': item.quantity} for item in new_order.items]
+        }
+        asyncio.run(publish_order_created_event(order_event))
     else:
         payment.status = 'failed'
         new_order.status = 'cancelled'
     
     db.session.commit()
-    
-    # Publish order_created event to Kafka
-    order_event = {
-        'event_type': 'order_created',
-        'order_id': new_order.id,
-        'user_id': current_user_id,
-        'items': [{'product_id': item.product_id, 'quantity': item.quantity} for item in new_order.items]
-    }
-    kafka_producer.produce(
-        'order_created',
-        key=str(new_order.id),
-        value=json.dumps(order_event),
-        callback=delivery_report
-    )
-    kafka_producer.flush()
     
     return jsonify({
         'order': new_order.to_dict(),

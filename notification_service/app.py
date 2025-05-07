@@ -12,6 +12,8 @@ from email.mime.multipart import MIMEMultipart
 import jwt
 from functools import wraps
 from confluent_kafka import Consumer
+from nats.aio.client import NATS
+import asyncio
 
 app = Flask(__name__)
 
@@ -39,25 +41,14 @@ SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'noreply@shopeasy.com')
 
 db = SQLAlchemy(app)
 
-# Kafka consumer configuration
-kafka_consumer = Consumer({
-    'bootstrap.servers': 'kafka:9092',
-    'group.id': 'notification-service',
-    'auto.offset.reset': 'earliest'
-})
-kafka_consumer.subscribe(['order_created'])
+# NATS subscriber configuration
+nats_client = NATS()
 
-def consume_events():
-    while True:
-        msg = kafka_consumer.poll(1.0)  # Poll for messages
-        if msg is None:
-            continue
-        if msg.error():
-            print(f"Consumer error: {msg.error()}")
-            continue
-
-        # Process the event
-        event = json.loads(msg.value().decode('utf-8'))
+async def run(loop):
+    await nats_client.connect(servers=["nats://nats:4222"], loop=loop)
+    
+    async def message_handler(msg):
+        event = json.loads(msg.data.decode('utf-8'))
         print(f"Received event: {event}")
 
         if event['event_type'] == 'order_created':
@@ -69,8 +60,10 @@ def consume_events():
                 'items': event['items']
             })
 
-# Start Kafka consumer in a separate thread
-threading.Thread(target=consume_events, daemon=True).start()
+    await nats_client.subscribe("order_created", cb=message_handler)
+
+loop = asyncio.get_event_loop()
+loop.run_until_complete(run(loop))
 
 # Middleware to log all incoming requests
 @app.before_request
