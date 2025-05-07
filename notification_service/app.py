@@ -49,67 +49,31 @@ with app.app_context():
 nats_client = NATS()
 
 async def run(loop):
+    print("\n\n Shubham starting nats client \n\n", flush=True)
     await nats_client.connect(servers=["nats://nats:4222"])
+    print("\n\n Shubham connected to nats server \n\n", flush=True)
     
     async def message_handler(msg):
         event = json.loads(msg.data.decode('utf-8'))
         print(f"Received event: {event}")
 
         if event['event_type'] == 'order_created':
-            # Send notification for order creation
-            user_id = event['user_id']
-            order_id = event['order_id']
-            send_notification(user_id, 'order_placed', {
-                'order_id': order_id,
-                'items': event['items']
-            })
+            # For now, just print the event
+            print(f"\n\nShubham Order placed event received: {event}", flush=True)
 
     await nats_client.subscribe("order_created", cb=message_handler)
+    print("\n\n Shubham subscribed to 'order_created' subject \n\n", flush=True)
+    while True:
+        await asyncio.sleep(1)  # Keep the listener alive
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(run(loop))
+def start_nats_listener():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run(loop))
 
-# Background worker to process notifications
-def notification_worker():
-    with app.app_context():
-        while True:
-            try:
-                # Get unsent notifications
-                notifications = Notification.query.filter_by(sent=False).limit(10).all()
-                
-                for notification in notifications:
-                    # Get user preferences
-                    preferences = UserNotificationPreference.query.filter_by(user_id=notification.user_id).first()
-                    
-                    if not preferences:
-                        # Create default preferences if not set
-                        preferences = UserNotificationPreference(user_id=notification.user_id)
-                        db.session.add(preferences)
-                        db.session.commit()
-                    
-                    # Process notification based on type and preferences
-                    if notification.type == 'email' and preferences.email_notifications and preferences.email:
-                        data = json.loads(notification.data) if notification.data else {}
-                        subject = data.get('subject', 'Notification from ShopEasy')
-                        
-                        if send_email(preferences.email, subject, notification.content):
-                            notification.sent = True
-                    
-                    elif notification.type == 'in-app':
-                        # In-app notifications are marked as sent immediately
-                        notification.sent = True
-                    
-                    db.session.commit()
-            
-            except Exception as e:
-                print(f"Error in notification worker: {str(e)}")
-            
-            # Sleep before next batch
-            time.sleep(5)
-
-# Start notification worker in a separate thread
-notification_thread = threading.Thread(target=notification_worker, daemon=True)
-notification_thread.start()
+# Start NATS listener in a background thread
+nats_thread = threading.Thread(target=start_nats_listener, daemon=True)
+nats_thread.start()
 
 # Register blueprints
 app.register_blueprint(notifications_blueprint, url_prefix='/api/notifications')
@@ -120,6 +84,7 @@ def health_check():
     return jsonify({'status': 'healthy'}), 200
 
 if __name__ == '__main__':
+    print("\n\n Shubham starting notification service \n\n", flush=True)
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=8080, debug=True)

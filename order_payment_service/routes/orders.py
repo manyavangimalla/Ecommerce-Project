@@ -80,12 +80,11 @@ def create_order(current_user_id):
     # Process payment
     # In a real application, this would integrate with a payment gateway like Stripe
     # payment_successful = True
-    
+
     # if payment_successful:
     #     payment.status = 'completed'
     #     payment.transaction_id = str(uuid.uuid4())  # This would be the transaction ID from the payment gateway
     #     new_order.status = 'processing'
-        
     #     # Update inventory
     #     try:
     #         requests.post(
@@ -96,7 +95,6 @@ def create_order(current_user_id):
     #     except:
     #         # Log error, but don't fail the order
     #         pass
-        
     #     # Send notification
     #     send_notification(
     #         current_user_id,
@@ -107,19 +105,18 @@ def create_order(current_user_id):
     #             'status': new_order.status
     #         }
     #     )
-    #     # Publish order_created event to NATS
-    #     order_event = {
-    #         'event_type': 'order_created',
-    #         'order_id': new_order.id,
-    #         'user_id': current_user_id,
-    #         'items': [{'product_id': item.product_id, 'quantity': item.quantity} for item in new_order.items]
-    #     }
-    #     asyncio.run(publish_order_created_event(order_event))
     # else:
     #     payment.status = 'failed'
     #     new_order.status = 'cancelled'
-    
-    # db.session.commit()
+
+    # Publish order_created event to NATS
+    order_event = {
+        'event_type': 'order_created',
+        'order_id': new_order.id,
+        'user_id': current_user_id,
+        'items': [{'product_id': item.product_id, 'quantity': item.quantity} for item in new_order.items]
+    }
+    asyncio.run(publish_order_created_event(order_event))
     
     return jsonify({
         'order': new_order.to_dict(),
