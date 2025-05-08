@@ -64,6 +64,7 @@ if __name__ == '__main__':
     print(f"\n\nConnecting to database at {DATABASE_URL}")
     with app.app_context():
         db.init_app(app)
+        db.create_all()  # Ensure all tables are created before querying
         
         # Add initial categories if none exist
         if not Category.query.first():

@@ -6,10 +6,7 @@
 <div class="row">
     <div class="col-md-6">
         <div class="bg-light p-5 text-center rounded">
-            <svg width="300" height="300" fill="currentColor" class="text-secondary">
-                <rect width="300" height="300" />
-                <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff">Product Image</text>
-            </svg>
+            <img src="{{ product.image or url_for('static', filename='images/placeholder.jpg') }}" class="img-fluid" alt="{{ product.name }}">
         </div>
     </div>
     <div class="col-md-6">

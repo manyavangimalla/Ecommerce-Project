@@ -11,6 +11,6 @@ async def publish_order_created_event(order_event):
         print(f"Publishing event to 'order_created': {order_event}", flush=True)
         await nats_client.publish("order_created", json.dumps(order_event).encode('utf-8'))
         print("Event published successfully!", flush=True)
-        await nats_client.close()
+        await nats_client.close() 
     except Exception as e:
         print(f"Error publishing order_created event to NATS: {e}", flush=True) 

@@ -1,10 +1,12 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ecommerce
-  labels:
-    name: ecommerce
----
+# Removed Namespace resource to allow Helm --create-namespace to work without errors
+# apiVersion: v1
+# kind: Namespace
+# metadata:
+#   name: ecommerce
+#   labels:
+#     name: ecommerce
+# ---
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -29,6 +31,8 @@ data:
   DB_PASSWORD: cGFzc3dvcmQxMjM=
   JWT_SECRET: c2VjcmV0and0a2V5MTIz
   API_KEY: YXBpa2V5MTIzNDU=
+  SENDER_EMAIL: c2h1YmhhbWdoYWRnZXJvY2tzQGdtYWlsLmNvbQo=
+  SENDGRID_API_KEY: U0cuSDE5LTFBSURSbHllMUxra0d4NDFEUS4tQnluRzdYcmlaVFZyWVktdFhjdjZpS3F2cmh2N1dBNVBKOXFkWnV5cmlzCg==
 ---
 # User Auth Service
 apiVersion: apps/v1
@@ -76,6 +80,13 @@ spec:
               key: JWT_SECRET
         ports:
         - containerPort: 8080
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 50m
+            memory: 128Mi
 ---
 apiVersion: v1
 kind: Service
@@ -136,6 +147,13 @@ spec:
               key: JWT_SECRET
         ports:
         - containerPort: 8080
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 50m
+            memory: 128Mi
 ---
 apiVersion: v1
 kind: Service
@@ -196,6 +214,13 @@ spec:
               key: JWT_SECRET
         ports:
         - containerPort: 8080
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 50m
+            memory: 128Mi
 ---
 apiVersion: v1
 kind: Service
@@ -254,8 +279,25 @@ spec:
             secretKeyRef:
               name: ecommerce-secrets
               key: JWT_SECRET
+        - name: SENDER_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: SENDER_EMAIL
+        - name: SENDGRID_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ecommerce-secrets
+              key: SENDGRID_API_KEY
         ports:
         - containerPort: 8080
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 50m
+            memory: 128Mi
 ---
 apiVersion: v1
 kind: Service
@@ -316,6 +358,13 @@ spec:
               key: JWT_SECRET
         ports:
         - containerPort: 8080
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
 ---
 apiVersion: v1
 kind: Service
@@ -376,6 +425,13 @@ spec:
               key: JWT_SECRET
         ports:
         - containerPort: 8080
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
 ---
 apiVersion: v1
 kind: Service
@@ -398,7 +454,7 @@ metadata:
   namespace: ecommerce
 spec:
   serviceName: ecommerce-db
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: ecommerce-db
@@ -422,9 +478,18 @@ spec:
               key: DB_PASSWORD
         - name: POSTGRES_DB
           value: ecommerce_db
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         volumeMounts:
         - name: postgres-data
           mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
   volumeClaimTemplates:
   - metadata:
       name: postgres-data
@@ -468,6 +533,13 @@ spec:
         image: nats:latest
         ports:
         - containerPort: 4222
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
 ---
 # NATS Service
 apiVersion: v1

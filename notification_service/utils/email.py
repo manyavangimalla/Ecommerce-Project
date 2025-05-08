@@ -9,8 +9,7 @@ SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
 SMTP_USERNAME = os.environ.get('SMTP_USERNAME', 'your-email@gmail.com')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'your-password')
-SENDER_EMAIL = 'shubhamghadgerocks@gmail.com'
-
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL')
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
 
 def send_email(to_email, subject, content):
@@ -38,7 +37,6 @@ def send_email(to_email, subject, content):
         return False 
 
 def send_email_sendgrid(to_email, subject, content):
-    SENDGRID_API_KEY = ""
     if not SENDGRID_API_KEY:
         print(f"[SendGrid] Would send email to {to_email} with subject '{subject}': {content}")
         return True

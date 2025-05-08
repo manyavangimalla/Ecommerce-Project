@@ -140,5 +140,3 @@ database:
   user: "ecommerce_user"
   passwordSecret: "ecommerce-secrets"
   passwordKey: "DB_PASSWORD"
-
-jwtSecret: "supersecretjwtkey"

@@ -31,7 +31,7 @@ def admin_required(f):
         # For now, we'll just pass it through
         return f(current_user_id, *args, **kwargs)
     
-    return decorated
+    return decorated 
 
 # Middleware to log all incoming requests
 def log_request():

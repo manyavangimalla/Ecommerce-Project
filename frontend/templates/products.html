@@ -64,10 +64,7 @@
             <div class="col-md-4 mb-4">
                 <div class="card h-100">
                     <div class="card-img-top bg-light text-center py-4">
-                        <svg width="100" height="100" fill="currentColor" class="text-secondary">
-                            <rect width="100" height="100" />
-                            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff">Product</text>
-                        </svg>
+                        <img src="{{ product.image or url_for('static', filename='images/placeholder.jpg') }}" class="card-img-top" alt="{{ product.name }}">
                     </div>
                     <div class="card-body">
                         <h5 class="card-title">{{ product.name }}</h5>

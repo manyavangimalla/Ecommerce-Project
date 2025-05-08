@@ -80,7 +80,7 @@ def create_order(current_user_id):
     # Process payment
     # In a real application, this would integrate with a payment gateway like Stripe
     # payment_successful = True
-
+    
     # if payment_successful:
     #     payment.status = 'completed'
     #     payment.transaction_id = str(uuid.uuid4())  # This would be the transaction ID from the payment gateway
@@ -108,7 +108,7 @@ def create_order(current_user_id):
     # else:
     #     payment.status = 'failed'
     #     new_order.status = 'cancelled'
-
+    
     # Publish order_created event to NATS
     order_event = {
         'event_type': 'order_created',

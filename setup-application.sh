@@ -1,86 +1,84 @@
 #!/bin/bash
 
-# This script sets up the entire application for local or cloud deployment.
-# Usage: ./setup-application.sh <build|deploy> [--force-rebuild] [--services=<service1,service2,...>]
+set -e
 
-# Prompt for deployment target if not provided
-if [ -z "$1" ] || { [ "$1" != "build" ] && [ "$1" != "deploy" ]; }; then
-  echo "Usage: $0 <build|deploy> [--force-rebuild] [--services=<service1,service2,...>]"
+# Default values
+ACTION=""
+ENVIRONMENT=""
+FORCE_REBUILD="false"
+SERVICES=""
+CLOUD_PROVIDER=""
+
+# Helper: print usage
+usage() {
+  echo "Usage: $0 --action build|deploy --env local|cloud [--cloud-provider gcp] [--force-rebuild true|false] [--services service1,service2,...]"
   exit 1
-fi
+}
 
-# Prompt for environment if not provided
-if [ -z "$2" ]; then
-  echo "Select deployment target:"
-  echo "1) Local (Minikube)"
-  echo "2) Cloud (GCP)"
-  read -p "Enter choice [1-2]: " choice
-  case $choice in
-    1)
-      DEPLOY_ENV="local"
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --action)
+      ACTION="$2"
+      shift 2
       ;;
-    2)
-      DEPLOY_ENV="gcp"
+    --env)
+      ENVIRONMENT="$2"
+      shift 2
+      ;;
+    --cloud-provider)
+      CLOUD_PROVIDER="$2"
+      shift 2
+      ;;
+    --force-rebuild)
+      FORCE_REBUILD="$2"
+      shift 2
+      ;;
+    --services)
+      SERVICES="$2"
+      shift 2
       ;;
     *)
-      echo "Invalid choice. Exiting."
-      exit 1
-      ;;
-  esac
-else
-  DEPLOY_ENV=$2
-fi
-
-# Check for force rebuild flag
-FORCE_REBUILD=false
-if [[ "$@" =~ "--force-rebuild" ]]; then
-  FORCE_REBUILD=true
-fi
-
-# Parse arguments for specific flags
-SERVICES=()
-for arg in "$@"; do
-  case $arg in
-    --services=*)
-      IFS=',' read -r -a SERVICES <<< "${arg#*=}"
+      echo "Unknown argument: $1"
+      usage
       ;;
   esac
 done
 
-# Step 0: Ensure namespace exists and is properly labeled/annotated
-ensure_namespace() {
-  echo "Ensuring namespace exists and is properly configured..."
-  
-  echo "Namespace 'ecommerce' not found. Creating it..."
-  kubectl create namespace ecommerce
-  
-  echo "Namespace 'ecommerce' already exists. Ensuring proper labels and annotations..."
-  kubectl label namespace ecommerce app.kubernetes.io/managed-by=Helm --overwrite
-  kubectl annotate namespace ecommerce meta.helm.sh/release-name=ecommerce --overwrite
-  kubectl annotate namespace ecommerce meta.helm.sh/release-namespace=ecommerce --overwrite
+# Validate required args
+if [[ -z "$ACTION" || -z "$ENVIRONMENT" ]]; then
+  usage
+fi
+
+# If env is cloud, --cloud-provider is required
+if [[ "$ENVIRONMENT" == "cloud" ]]; then
+  if [[ -z "$CLOUD_PROVIDER" ]]; then
+    echo "Error: --cloud-provider flag is required when --env is cloud."
+    usage
+  fi
+  if [[ "$CLOUD_PROVIDER" != "gcp" ]]; then
+    echo "Error: Only 'gcp' is currently supported for --cloud-provider."
+    exit 1
+  fi
+fi
+
+# Detect services if not provided
+detect_services() {
+  find . -maxdepth 1 -type d \( -name 'user_auth_service' -o -name 'product_inventory_service' -o -name 'order_payment_service' -o -name 'notification_service' -o -name 'frontend' -o -name 'api_gateway' \) -exec test -f {}/Dockerfile \; -print | sed 's|^./||'
 }
 
-# Step 0.5: Configure Minikube's Docker environment (for local deployment)
-configure_minikube_docker() {
-  if [ "$DEPLOY_ENV" == "local" ]; then
-    echo "Configuring Minikube's Docker environment..."
-    eval $(minikube docker-env)
-  fi
-}
+if [[ -z "$SERVICES" ]]; then
+  SERVICES=$(detect_services | paste -sd "," -)
+fi
 
-# Step 1: Build Docker images
-build_images() {
-  echo "Building Docker images..."
-  services=("user_auth_service" "notification_service" "product_inventory_service" "order_payment_service" "api_gateway" "frontend")
+IFS=',' read -r -a SERVICE_ARRAY <<< "$SERVICES"
 
-  # Use the services specified by the --services flag, if provided
-  if [ "${#SERVICES[@]}" -gt 0 ]; then
-    services=("${SERVICES[@]}")
-  fi
-
-  for service in "${services[@]}"; do
+# Build images
+build_images_local() {
+  echo "Building Docker images for local..."
+  for service in "${SERVICE_ARRAY[@]}"; do
     echo "Building $service..."
-    if [ "$FORCE_REBUILD" = true ]; then
+    if [[ "$FORCE_REBUILD" == "true" ]]; then
       docker build --no-cache -t "${service,,}:local" ./$service
     else
       docker build -t "${service,,}:local" ./$service
@@ -88,64 +86,38 @@ build_images() {
   done
 }
 
-# Step 2: Push Docker images to registry (for cloud deployment)
-push_images() {
-  echo "Pushing Docker images to registry..."
-  # This will be handled by cloud/gcp.sh for GCP
+deploy_local() {
+  echo "Deploying application using Helm (local)..."
+  helm upgrade --install ecommerce ./ecommerce \
+    --set image.registry="" \
+    --set image.tag="local" \
+    --namespace ecommerce
 }
 
-# Step 3: Deploy using Helm
-deploy_with_helm() {
-  echo "Deploying application using Helm..."
-  if [ "$DEPLOY_ENV" == "gcp" ]; then
-    # Call GCP-specific deployment script
-    ./cloud/gcp.sh "$1" "$DEPLOY_ENV" "${SERVICES[@]}" "$FORCE_REBUILD"
-    return
-  elif [ "$DEPLOY_ENV" == "local" ]; then
-    helm upgrade --install ecommerce ./ecommerce \
-      --set image.registry="" \
-      --set image.tag="local" \
-      --namespace ecommerce
+# Main logic
+if [[ "$ENVIRONMENT" == "local" ]]; then
+  if [[ "$ACTION" == "build" ]]; then
+    build_images_local
+  elif [[ "$ACTION" == "deploy" ]]; then
+    deploy_local
   else
-    echo "Invalid deployment environment: $DEPLOY_ENV"
+    usage
+  fi
+elif [[ "$ENVIRONMENT" == "cloud" ]]; then
+  if [[ "$CLOUD_PROVIDER" == "gcp" ]]; then
+    if [[ "$ACTION" == "build" ]]; then
+      ./cloud/gcp.sh build "$CLOUD_PROVIDER" "$FORCE_REBUILD"
+    elif [[ "$ACTION" == "deploy" ]]; then
+      ./cloud/gcp.sh deploy "$CLOUD_PROVIDER"
+    else
+      usage
+    fi
+  else
+    echo "Cloud provider $CLOUD_PROVIDER not supported yet."
     exit 1
   fi
-}
-
-# Step 4: Update or create ConfigMap for deployment environment
-update_configmap() {
-  echo "Ensuring ConfigMap exists and is updated for deployment environment..."
-  
-  kubectl create configmap ecommerce-config \
-      --namespace ecommerce \
-      --from-literal=DEPLOY_ENV="$DEPLOY_ENV"
-  
-    echo "Updating existing ConfigMap 'ecommerce-config'..."
-    kubectl label configmap ecommerce-config app.kubernetes.io/managed-by=Helm --namespace ecommerce --overwrite
-    kubectl annotate configmap ecommerce-config meta.helm.sh/release-name=ecommerce --namespace ecommerce --overwrite
-    kubectl annotate configmap ecommerce-config meta.helm.sh/release-namespace=ecommerce --namespace ecommerce --overwrite
-    kubectl patch configmap ecommerce-config \
-      --namespace ecommerce \
-      --type merge \
-      --patch "{\"data\":{\"DEPLOY_ENV\":\"$DEPLOY_ENV\"}}"
-}
-
-# Main script execution
-if [ "$1" == "build" ]; then
-  ensure_namespace
-  configure_minikube_docker  # Ensure Minikube's Docker is used for local builds
-  build_images
-  if [ "$DEPLOY_ENV" == "gcp" ]; then
-    # Call GCP-specific build/push logic
-    ./cloud/gcp.sh build "$DEPLOY_ENV" "${SERVICES[@]}" "$FORCE_REBUILD"
-  fi
-elif [ "$1" == "deploy" ]; then
-  ensure_namespace
-  update_configmap
-  deploy_with_helm "$1"
 else
-  echo "Invalid command. Usage: $0 <build|deploy> [--force-rebuild] [--services=<service1,service2,...>]"
-  exit 1
+  usage
 fi
 
-echo "Application setup complete for $DEPLOY_ENV deployment."
+echo "Application setup complete for $ENVIRONMENT deployment."

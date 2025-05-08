@@ -9,11 +9,11 @@
 <div class="row">
     <div class="col-md-8">
         <form action="{{ url_for('place_order') }}" method="post">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Shipping Information</h5>
-                </div>
-                <div class="card-body">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Shipping Information</h5>
+            </div>
+            <div class="card-body">
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="firstName" class="form-label">First Name</label>
@@ -55,48 +55,48 @@
                             <input type="text" class="form-control" id="zip" required>
                         </div>
                     </div>
-                </div>
             </div>
-            
+        </div>
+        
             <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Payment Method</h5>
-                </div>
-                <div class="card-body">
+            <div class="card-header">
+                <h5 class="mb-0">Payment Method</h5>
+            </div>
+            <div class="card-body">
                     <div class="mb-3">
                         <label for="payment_method" class="form-label">Select Payment Method</label>
                         <select class="form-select" id="payment_method" name="payment_method" required>
                             <option value="credit_card">Credit Card</option>
                             <option value="paypal">PayPal</option>
                         </select>
+                </div>
+                
+                <div id="creditCardForm">
+                    <div class="mb-3">
+                        <label for="cardNumber" class="form-label">Card Number</label>
+                        <input type="text" class="form-control" id="cardNumber" placeholder="XXXX XXXX XXXX XXXX">
                     </div>
                     
-                    <div id="creditCardForm">
-                        <div class="mb-3">
-                            <label for="cardNumber" class="form-label">Card Number</label>
-                            <input type="text" class="form-control" id="cardNumber" placeholder="XXXX XXXX XXXX XXXX">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="expiryDate" class="form-label">Expiry Date</label>
+                            <input type="text" class="form-control" id="expiryDate" placeholder="MM/YY">
                         </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="expiryDate" class="form-label">Expiry Date</label>
-                                <input type="text" class="form-control" id="expiryDate" placeholder="MM/YY">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="cvv" class="form-label">CVV</label>
-                                <input type="text" class="form-control" id="cvv" placeholder="XXX">
-                            </div>
+                        <div class="col-md-6">
+                            <label for="cvv" class="form-label">CVV</label>
+                            <input type="text" class="form-control" id="cvv" placeholder="XXX">
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
             
             <div class="d-grid">
                 <button type="submit" class="btn btn-primary btn-lg">Place Order</button>
-            </div>
+        </div>
         </form>
     </div>
-
+    
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
@@ -131,7 +131,7 @@
                         </li>
                         {% endfor %}
                     </ul>
-                </div>
+                    </div>
             </div>
         </div>
     </div>

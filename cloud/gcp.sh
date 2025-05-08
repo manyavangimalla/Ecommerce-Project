@@ -3,7 +3,7 @@
 # GCP-specific build/push/deploy logic for the ecommerce project
 # Usage: ./cloud/gcp.sh <build|deploy> <gcp> <services> <force_rebuild>
 
-GCP_PROJECT_ID="your-gcp-project-id"  # TODO: Replace or make dynamic
+GCP_PROJECT_ID="cogent-joy-453920-v4"  # TODO: Replace or make dynamic
 CLOUD_REGISTRY="gcr.io/$GCP_PROJECT_ID"
 
 COMMAND=$1
@@ -22,27 +22,34 @@ gcp_auth() {
 }
 
 build_and_push_images() {
+  echo "Detecting service directories with Dockerfile..."
+  SERVICE_DIRS=( $(find . -maxdepth 1 -type d \( -name 'user_auth_service' -o -name 'product_inventory_service' -o -name 'order_payment_service' -o -name 'notification_service' -o -name 'frontend' -o -name 'api_gateway' \) -exec test -f {}/Dockerfile \; -print | sed 's|^./||') )
+  echo "Found services: ${SERVICE_DIRS[*]}"
   echo "Building and pushing Docker images to $CLOUD_REGISTRY..."
-  for service in "${SERVICES[@]}"; do
-    echo "Building $service..."
+  for service in "${SERVICE_DIRS[@]}"; do
+    IMAGE_NAME="$service:latest"
+    echo "Building $service as $IMAGE_NAME..."
     if [ "$FORCE_REBUILD" = true ]; then
-      docker build --no-cache -t "$service:latest" ./$service
+      docker build --no-cache -t "$IMAGE_NAME" ./$service
     else
-      docker build -t "$service:latest" ./$service
+      docker build -t "$IMAGE_NAME" ./$service
     fi
-    echo "Tagging $service for GCR..."
-    docker tag "$service:latest" "$CLOUD_REGISTRY/$service:latest"
-    echo "Pushing $service to $CLOUD_REGISTRY..."
-    docker push "$CLOUD_REGISTRY/$service:latest"
+    echo "Tagging $IMAGE_NAME for GCR..."
+    docker tag "$IMAGE_NAME" "$CLOUD_REGISTRY/$IMAGE_NAME"
+    echo "Pushing $IMAGE_NAME to $CLOUD_REGISTRY..."
+    docker push "$CLOUD_REGISTRY/$IMAGE_NAME"
   done
 }
 
 deploy_with_helm() {
   echo "Deploying application to GKE using Helm..."
+  # kubectl get namespace ecommerce >/dev/null 2>&1 || kubectl create namespace ecommerce
   helm upgrade --install ecommerce ./ecommerce \
     --set image.registry="$CLOUD_REGISTRY" \
     --set image.tag="latest" \
-    --namespace ecommerce
+    -f ecommerce/values-gke.yaml \
+    --namespace ecommerce \
+    --create-namespace
 }
 
 case $COMMAND in
