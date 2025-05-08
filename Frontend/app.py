@@ -10,15 +10,29 @@ import time
 import uuid
 from functools import wraps
 from datetime import datetime
+import resend
 from db import db, get_user_by_email, create_user, User
+from flask_login import current_user, login_required
+import smtplib
+from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Import for SendGrid
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+# In your send_simple_email function:
+gmail_user = os.environ.get('EMAIL_USER')
+gmail_password = os.environ.get('EMAIL_APP_PASSWORD')
+
 # Load dotenv for environment variables
 from dotenv import load_dotenv
 load_dotenv()
+
+CART_SERVICE_URL = os.environ.get('CART_SERVICE_URL', 'http://localhost:5001')
+ORDER_SERVICE_URL = os.environ.get('ORDER_SERVICE_URL', 'http://localhost:5002')
+PAYMENT_SERVICE_URL = os.environ.get('PAYMENT_SERVICE_URL', 'http://localhost:5003')
 
 # Disable SSL verification globally for development
 import urllib3
@@ -105,6 +119,43 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def send_simple_email(to_email, subject, html_content):
+    """
+    Simple email sending function using Gmail SMTP
+    """
+    try:
+        # Your Gmail credentials
+        gmail_user = 'your_email@gmail.com'  # Replace with your Gmail address
+        gmail_password = 'your_app_password'  # Replace with your Gmail app password
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['From'] = gmail_user
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        
+        # Attach HTML content
+        msg.attach(MIMEText(html_content, 'html'))
+        
+        # Connect to Gmail's SMTP server
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.ehlo()
+        server.login(gmail_user, gmail_password)
+        
+        # Send email
+        server.sendmail(gmail_user, to_email, msg.as_string())
+        server.close()
+        
+        print(f"Email sent successfully to {to_email}")
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        return False
 
 @app.route('/wishlist')
 @login_required
@@ -275,6 +326,7 @@ def remove_from_cart(product_id):
         session.modified = True
         flash('Item removed from cart', 'success')
     return redirect(url_for('cart'))
+
 @app.route('/api/wishlist/<item_id>', methods=['DELETE'])
 @login_required
 def remove_from_wishlist(item_id):
@@ -325,116 +377,250 @@ def checkout():
     
     return render_template('checkout.html', cart_products=cart_products, total=total)
 
-@app.route('/place_order', methods=['POST'])
+def send_notification(user_id, notification_type, email, data):
+    """
+    Send a notification via the notification microservice
+    """
+    try:
+        # Set up the notification data
+        notification_data = {
+            'user_id': user_id,
+            'type': notification_type,
+            'customer_email': email,
+            'data': data
+        }
+        
+        # Send to notification service
+        notification_service_url = os.environ.get('NOTIFICATION_SERVICE_URL', 'http://localhost:5004')
+        response = requests.post(
+            f"{notification_service_url}/api/notifications",
+            json=notification_data,
+            timeout=5
+        )
+        
+        if response.status_code == 201:
+            return True
+        else:
+            print(f"Failed to send notification: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"Error sending notification: {str(e)}")
+        return False
+
+def send_order_confirmation(user_id, email, order_data):
+    """
+    Send order confirmation via the notification microservice
+    """
+    try:
+        # Format items for notification service
+        notification_items = []
+        for item in order_data.get('items', []):
+            notification_items.append({
+                "product_name": item.get('name', 'Product'),
+                "quantity": item.get('quantity', 1),
+                "price": item.get('price', 0),
+                "subtotal": item.get('price', 0) * item.get('quantity', 1)
+            })
+        
+        # Prepare order data for notification
+        order_notification_data = {
+            'order_id': order_data.get('id', ''),
+            'total_amount': order_data.get('total', 0),
+            'shipping_address': order_data.get('shipping_address', ''),
+            'payment_method': order_data.get('payment_method', 'Credit Card'),
+            'items': notification_items
+        }
+        
+        # Send notification
+        return send_notification(
+            user_id=user_id,
+            notification_type='order_placed',
+            email=email,
+            data=order_notification_data
+        )
+        
+    except Exception as e:
+        print(f"Error sending order confirmation: {str(e)}")
+        return False
+
+@app.route('/place-order', methods=['POST'])
 @login_required
 def place_order():
-    user_id = session.get('user_id')
-    user_email = session.get('user_email')
-    cart_items = session.get('cart', [])
+    try:
+        # Get user information
+        user_id = session.get('user_id')
+        user_email = session.get('user_email')
+        
+        # Get cart items from session
+        cart_item_ids = session.get('cart', [])
+        
+        if not cart_item_ids:
+            flash('Your cart is empty', 'warning')
+            return redirect(url_for('cart'))
+        
+        # Convert cart items to product objects
+        cart_items = []
+        total = 0
+        
+        for item_id in cart_item_ids:
+            product = next((p for p in PRODUCTS if p['id'] == item_id), None)
+            if product:
+                cart_items.append({
+                    'id': product['id'],
+                    'name': product['name'],
+                    'price': product['price'],
+                    'quantity': 1,  # You could update this if you track quantities
+                    'image': product.get('image', '')
+                })
+                total += product['price']
+        
+        # Get form data for shipping and payment
+        shipping_address = request.form.get('shipping_address')
+        payment_method = request.form.get('payment_method')
+        
+        
+        # Create order data
+        order_data = {
+            'user_id': user_id,
+            'items': cart_items,
+            'shipping_address': shipping_address,
+            'payment_method': payment_method,
+            'total': total,
+            'status': 'pending',
+            'id': f"ORD-{int(time.time())}-{random.randint(1, 999)}"  # Generate a temporary order ID
+        }
+        
+        # In a real app, you would call your order service API here
+        # For now, store it in our temporary ORDERS list
+        ORDERS.append(order_data)
+        
+        # Clear the cart
+        session['cart'] = []
+        session.modified = True
+        
+        # Send order confirmation email
+        order_email_sent = False
+        try:
+            # Function to send email using Gmail SMTP
+            def send_simple_email(to_email, subject, html_content):
+                try:
+                    # Get Gmail credentials from environment variables
+                    gmail_user = os.environ.get('EMAIL_USER', 'your.email@gmail.com')
+                    gmail_password = os.environ.get('EMAIL_APP_PASSWORD', 'your-app-password')
+                    
+                    # Create message
+                    msg = MIMEMultipart('alternative')
+                    msg['From'] = f"ElectroCart <{gmail_user}>"
+                    msg['To'] = to_email
+                    msg['Subject'] = subject
+                    
+                    # Attach HTML content
+                    msg.attach(MIMEText(html_content, 'html'))
+                    
+                    # Connect to Gmail's SMTP server
+                    server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+                    server.ehlo()
+                    server.login(gmail_user, gmail_password)
+                    
+                    # Send email
+                    server.sendmail(gmail_user, to_email, msg.as_string())
+                    server.close()
+                    
+                    print(f"Email sent successfully to {to_email}")
+                    return True
+                except Exception as e:
+                    print(f"Failed to send email: {str(e)}")
+                    return False
+            
+            # Format items for email
+            items_html = ""
+            for item in cart_items:
+                items_html += f"""
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">{item.get('name', 'Product')}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">{item.get('quantity', 1)}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.get('price', 0):.2f}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.get('price', 0) * item.get('quantity', 1):.2f}</td>
+                </tr>
+                """
+            
+            # Create confirmation email
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; }}
+                    .container {{ max-width: 600px; margin: 0 auto; }}
+                    .header {{ background-color: #4CAF50; color: white; padding: 20px; text-align: center; }}
+                    table {{ width: 100%; border-collapse: collapse; }}
+                    th, td {{ padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }}
+                    .total {{ font-weight: bold; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Order Confirmation</h1>
+                    </div>
+                    
+                    <div style="padding: 20px;">
+                        <p>Thank you for your order!</p>
+                        
+                        <p><strong>Order Number:</strong> {order_data['id']}</p>
+                        <p><strong>Order Date:</strong> {datetime.now().strftime('%B %d, %Y')}</p>
+                        <p><strong>Shipping Address:</strong> {shipping_address}</p>
+                        <p><strong>Payment Method:</strong> {payment_method}</p>
+                        
+                        <h3>Order Summary</h3>
+                        <table>
+                            <tr>
+                                <th>Product</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                            {items_html}
+                            <tr class="total">
+                                <td colspan="3" style="text-align:right;">Total:</td>
+                                <td>${total:.2f}</td>
+                            </tr>
+                        </table>
+                        
+                        <p>We'll notify you when your order ships.</p>
+                        <p>Thank you for shopping with ElectroCart!</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # Send the email
+            order_email_sent = send_simple_email(
+                to_email=user_email,
+                subject=f"ElectroCart Order Confirmation #{order_data['id']}",
+                html_content=html_content
+            )
+            
+            if order_email_sent:
+                print(f"Order confirmation email sent to {user_email}")
+            else:
+                print(f"Failed to send order confirmation email to {user_email}")
+            
+        except Exception as e:
+            print(f"Error sending order email: {str(e)}")
+        
+        # Show success message and redirect
+        flash('Order placed successfully! You will receive a confirmation email shortly.', 'success')
+        return redirect(url_for('order_details', order_id=order_data['id']))
     
-    if not cart_items:
-        flash('Your cart is empty', 'warning')
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error processing order: {str(e)}")
+        flash('An error occurred while processing your order.', 'danger')
         return redirect(url_for('cart'))
-    
-    # Get cart products and calculate total
-    cart_products = []
-    total = 0
-    
-    for item_id in cart_items:
-        product = next((p for p in PRODUCTS if p['id'] == item_id), None)
-        if product:
-            cart_products.append(product)
-            total += product['price']
-    
-    # Get shipping and payment info from form
-    shipping_address = f"{request.form.get('address')}, {request.form.get('city')}, {request.form.get('state')} {request.form.get('zip')}"
-    payment_method = request.form.get('payment_method')
-    
-    # Generate a mock order ID
-    order_id = f"ORD-{int(time.time())}-{user_id}"
-    
-    # Create order items list for storage and notification
-    order_items = []
-    product_names = []
-    
-    for product in cart_products:
-        order_items.append({
-            "id": product['id'],
-            "name": product['name'],
-            "price": product['price'],
-            "quantity": 1  # Assuming quantity is 1 for simplicity
-        })
-        product_names.append(product['name'])
-    
-    # Format items for notification service
-    notification_items = []
-    for product in cart_products:
-        notification_items.append({
-            "product_name": product['name'],
-            "quantity": 1,
-            "price": product['price'],
-            "subtotal": product['price']
-        })
-    
-    # Calculate subtotal, tax, shipping cost
-    subtotal = total - 5.99 - (total * 0.08)
-    shipping_cost = 5.99
-    tax = total * 0.08
-    
-    # Create new order
-    new_order = {
-        "id": order_id,
-        "user_id": user_id,
-        "date": datetime.now().strftime('%B %d, %Y'),
-        "total": total,
-        "status": "Processing",
-        "items": order_items,
-        "shipping_address": shipping_address,
-        "payment_method": payment_method
-    }
-    
-    # Add to our temporary orders list
-    ORDERS.append(new_order)
-    
-    # Prepare notification data
-    notification_data = {
-        'type': 'order_placed',
-        'subject': f'Order Confirmation #{order_id}',
-        'order_id': order_id,
-        'total_amount': total,
-        'subtotal': subtotal,
-        'shipping_cost': shipping_cost,
-        'tax': tax,
-        'status': 'pending',
-        'customer_name': session.get('user_name', 'Valued Customer'),
-        'customer_email': user_email,
-        'shipping_address': shipping_address,
-        'payment_method': payment_method,
-        'items': notification_items,
-        'account_url': request.host_url + 'profile',
-        'unsubscribe_url': request.host_url + 'preferences',
-        'shop_url': request.host_url + 'products'
-    }
-    
-    # Send notification via microservice
-    notification_sent = send_notification(
-        user_id=user_id,
-        email=user_email,
-        notification_type='order_placed',
-        data=notification_data
-    )
-    
-    if notification_sent:
-        print("Notification sent successfully")
-    else:
-        print("Failed to send notification")
-    
-    # Clear the cart
-    session['cart'] = []
-    
-    flash('Order placed successfully! Check your email for confirmation.', 'success')
-    return redirect(url_for('order_history'))
-
+        
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -522,6 +708,80 @@ def get_user_orders(user_id):
         print(f"Error getting user orders: {str(e)}")
         return []
 
+@app.route('/resend_verification_code', methods=['POST'])
+def resend_verification_code():
+    """Resend verification code to user's email"""
+    try:
+        # Get email from form data or session
+        email = request.form.get('email') or session.get('verification_email')
+        
+        if not email:
+            return jsonify({'success': False, 'message': 'Email address is required'}), 400
+        
+        # Check if user exists
+        user = get_user_by_email(email)
+        if not user:
+            return jsonify({'success': False, 'message': 'Email not found'}), 404
+        
+        # Generate verification code
+        code = generate_verification_code()
+        
+        # Store code in session or database (with expiration)
+        session['verification_code'] = code
+        session['verification_email'] = email
+        session['code_expiration'] = (datetime.now() + timedelta(minutes=10)).timestamp()
+        
+        # Create verification code email context
+        context = {
+            'code': code,
+            'email': email
+        }
+        
+        # Generate tracking ID for email opens
+        tracking_id = str(uuid.uuid4())
+        
+        # Store tracking info in database if you're using it
+        # db.execute(
+        #     "INSERT INTO email_tracking (tracking_id, user_id, email_type, created_at) VALUES (?, ?, ?, ?)",
+        #     (tracking_id, user.get('id'), 'verification_code', datetime.now())
+        # )
+        # db.commit()
+        
+        # Queue the email if using Celery, otherwise send directly
+        # If you have implemented the Celery tasks:
+        # send_email_async.delay(
+        #     to_email=email,
+        #     subject="ElectroCart Verification Code",
+        #     template_name="verification_code",
+        #     context=context,
+        #     tracking_id=tracking_id
+        # )
+        # Else, send directly using your email function:
+        success = send_simple_email(
+            to_email=email,
+            subject="ElectroCart Verification Code",
+            html_content=f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>ElectroCart Verification Code</h2>
+                <p>Your verification code is:</p>
+                <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold;">
+                    {code}
+                </div>
+                <p>This code will expire in 10 minutes.</p>
+                <p>If you did not request this code, please ignore this email.</p>
+            </div>
+            '''
+        )
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Verification code resent. Please check your email'}), 200
+        else:
+            return jsonify({'success': False, 'message': 'Failed to send verification code'}), 500
+            
+    except Exception as e:
+        print(f"Error resending verification code: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred'}), 500
+    
 def get_order_details(user_id, order_id):
     """
     Fetch details for a specific order.
@@ -622,7 +882,7 @@ def register():
             
             # Send registration notification
             notification_data = {
-                'subject': 'Welcome to ShopEasy',
+                'subject': 'Welcome to  Electrocart',
                 'user_name': first_name,
                 'email': email
             }
@@ -645,6 +905,9 @@ def register():
             flash(f'Registration failed: {str(e)}', 'danger')
     
     return render_template('register.html')
+
+
+    
 @app.route('/logout')
 def logout():
     session.clear()
@@ -693,79 +956,7 @@ def update_notification_preferences(user_id, email, name):
     except Exception as e:
         print(f"Error setting notification preferences: {str(e)}")
         return False
-    
-def send_notification(user_id, email, notification_type, data):
-    """
-    Send notification via the notification microservice
-    """
-    try:
-        # Check if we're running inside Docker or locally
-        if os.environ.get('RUNNING_IN_DOCKER', 'false').lower() == 'true':
-            # Use Docker service name when running inside Docker
-            notification_service_url = 'http://notification_service:5004/api/notifications'
-        else:
-            # Use localhost when running outside Docker
-            notification_service_url = 'http://localhost:5004/api/notifications'
-        
-        print(f"Sending notification to: {notification_service_url}")
-        
-        # Create the notification payload
-        payload = {
-            'user_id': user_id,
-            'type': notification_type,
-            'data': data,
-            'customer_email': email
-        }
-        
-        # For debugging
-        print(f"Notification payload: {json.dumps(payload, indent=2)}")
-        
-        response = requests.post(
-            notification_service_url,
-            headers={'Content-Type': 'application/json'},
-            data=json.dumps(payload),
-            timeout=10,
-            verify=False  # Only for development
-        )
-        
-        print(f"Notification response: {response.status_code} - {response.text}")
-        
-        if response.status_code == 201:
-            print(f"Notification sent successfully to {email}")
-            return True
-        else:
-            print(f"Failed to send notification: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"Error sending notification: {str(e)}")
-        return False
 
-def get_notification_service_url():
-    """
-    Determine the notification service URL based on environment
-    Try different possibilities and use the first one that works
-    """
-    possible_urls = [
-        "http://notification_service:5004/api/notifications",
-        "http://localhost:5004/api/notifications",
-        "http://127.0.0.1:5004/api/notifications"
-    ]
-    
-    for url in possible_urls:
-        try:
-            # Try to connect with a short timeout
-            response = requests.get(url.replace("/api/notifications", "/health"), timeout=0.5)
-            if response.status_code == 200:
-                print(f"Successfully connected to notification service at {url}")
-                return url
-        except:
-            # If connection fails, try the next URL
-            continue
-    
-    # Default to localhost if none of the URLs work
-    print("Could not verify notification service URL, defaulting to localhost")
-    return "http://localhost:5004/api/notifications"
 
 @app.route('/test-notification')
 def test_notification():
@@ -813,6 +1004,7 @@ def test_notification():
     
     except Exception as e:
         return f"Error: {str(e)}"
+
 @app.route('/profile')
 @login_required
 def profile():
@@ -831,6 +1023,39 @@ def profile():
     
     return render_template('profile.html', user=user.to_dict(), orders=orders)
 
+def send_simple_email(to_email, subject, html_content):
+    """
+    Simple email sending function using Gmail SMTP
+    """
+    try:
+        # Your Gmail credentials
+        gmail_user = os.environ.get('EMAIL_USER', 'your.email@gmail.com')
+        gmail_password = os.environ.get('EMAIL_APP_PASSWORD', 'your-app-password')
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['From'] = f"ElectroCart <{gmail_user}>"
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        
+        # Attach HTML content
+        msg.attach(MIMEText(html_content, 'html'))
+        
+        # Connect to Gmail's SMTP server
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.ehlo()
+        server.login(gmail_user, gmail_password)
+        
+        # Send email
+        server.sendmail(gmail_user, to_email, msg.as_string())
+        server.close()
+        
+        print(f"Email sent successfully to {to_email}")
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        return False
+
 @app.route('/send_verification_code', methods=['POST'])
 def send_verification_code():
     email = request.form.get('email')
@@ -842,9 +1067,7 @@ def send_verification_code():
     # Check if user exists
     user = get_user_by_email(email)
     if not user:
-        # Clear message and show a specific "not registered" message
         flash('This email is not registered. Please create an account first.', 'danger')
-        # Add JavaScript to show a confirmation dialog after page loads
         return """
         <script>
             if (confirm('This email is not registered. Would you like to create an account?')) {
@@ -864,114 +1087,32 @@ def send_verification_code():
     session['verification_email'] = email
     session['code_expiration'] = (datetime.now() + timedelta(minutes=10)).timestamp()
     
-    # Your verified sender email
-    from_email = "your-verified-sender@yourdomain.com"  # REPLACE with your verified email
+    # Create HTML content for verification email
+    html_content = f'''
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>ElectroCart Verification Code</h2>
+        <p>Your verification code is:</p>
+        <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold;">
+            {code}
+        </div>
+        <p>This code will expire in 10 minutes.</p>
+        <p>If you did not request this code, please ignore this email.</p>
+    </div>
+    '''
     
-    message = Mail(
-        from_email=from_email,
-        to_emails=email,
+    # Send email
+    email_sent = send_simple_email(
+        to_email=email,
         subject='ElectroCart Verification Code',
-        html_content=f'''
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>ElectroCart Verification Code</h2>
-            <p>Your verification code is:</p>
-            <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold;">
-                {code}
-            </div>
-            <p>This code will expire in 10 minutes.</p>
-            <p>If you did not request this code, please ignore this email.</p>
-        </div>
-        '''
+        html_content=html_content
     )
     
-    try:
-        sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
-        # Disable SSL verification for this session
-        sg.client.session.verify = False
-        
-        print("Sending email via SendGrid...")
-        response = sg.send(message)
-        
-        print(f"SendGrid response status code: {response.status_code}")
-        
-        if response.status_code >= 200 and response.status_code < 300:
-            flash('Verification code sent to your email. Please check your inbox and spam folder.', 'success')
-        else:
-            flash(f'Error from SendGrid: Status code {response.status_code}', 'danger')
-            
-        return redirect(url_for('login', tab='verification'))
-        
-    except Exception as e:
-        error_message = str(e)
-        print(f"Error sending email via SendGrid: {error_message}")
-        flash(f'Error sending verification code: {error_message}', 'danger')
-        return redirect(url_for('login'))
-
-@app.route('/resend_verification_code', methods=['POST'])
-def resend_verification_code():
-    email = request.form.get('email') or session.get('verification_email')
+    if email_sent:
+        flash('Verification code sent to your email. Please check your inbox and spam folder.', 'success')
+    else:
+        flash('Error sending verification code. Please try again later.', 'danger')
     
-    if not email:
-        flash('Email address not found. Please start the login process again.', 'danger')
-        return redirect(url_for('login'))
-    
-    # Check if user exists
-    user = get_user_by_email(email)
-    if not user:
-        flash('Email not registered. Please create an account first.', 'danger')
-        return redirect(url_for('register'))
-    
-    # Generate new verification code
-    code = generate_verification_code()
-    print(f"Generated new verification code: {code} for {email}")
-    
-    # Update session with new code
-    session['verification_code'] = code
-    session['verification_email'] = email
-    session['code_expiration'] = (datetime.now() + timedelta(minutes=10)).timestamp()
-    
-    # Your verified sender email
-    from_email = "your-verified-sender@yourdomain.com"  # REPLACE with your verified email
-    
-    message = Mail(
-        from_email=from_email,
-        to_emails=email,
-        subject='ElectroCart New Verification Code',
-        html_content=f'''
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>ElectroCart Verification Code</h2>
-            <p>Your new verification code is:</p>
-            <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold;">
-                {code}
-            </div>
-            <p>This code will expire in 10 minutes.</p>
-            <p>If you did not request this code, please ignore this email.</p>
-        </div>
-        '''
-    )
-    
-    try:
-        sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
-        # Disable SSL verification for this session
-        sg.client.session.verify = False
-        
-        print("Resending email via SendGrid...")
-        response = sg.send(message)
-        
-        print(f"SendGrid response status code: {response.status_code}")
-        
-        if response.status_code >= 200 and response.status_code < 300:
-            flash('New verification code sent to your email. Please check your inbox and spam folder.', 'success')
-        else:
-            flash(f'Error from SendGrid: Status code {response.status_code}', 'danger')
-            
-        return redirect(url_for('login', tab='verification'))
-        
-    except Exception as e:
-        error_message = str(e)
-        print(f"Error sending email via SendGrid: {error_message}")
-        flash(f'Error sending verification code: {error_message}', 'danger')
-        return redirect(url_for('login'))
+    return redirect(url_for('login', tab='verification'))
     
 @app.route('/verify_code', methods=['POST'])
 def verify_code():
@@ -1011,6 +1152,7 @@ def verify_code():
     else:
         flash('User not found', 'danger')
         return redirect(url_for('login'))
+
 @app.route('/clear_verification_session', methods=['POST'])
 def clear_verification_session():
     """Clear verification related session data"""
@@ -1018,6 +1160,7 @@ def clear_verification_session():
     session.pop('verification_email', None)
     session.pop('code_expiration', None)
     return jsonify({'success': True})
+
 # Setup database tables
 with app.app_context():
     db.create_all()  # Create database tables if they don't exist

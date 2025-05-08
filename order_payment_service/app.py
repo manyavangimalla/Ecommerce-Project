@@ -9,7 +9,7 @@ from functools import wraps
 import json
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/order_db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///orders.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev_secret_key')
 
@@ -117,10 +117,12 @@ def send_notification(user_id, notification_type, data):
                 'user_id': user_id,
                 'type': notification_type,
                 'data': data
-            }
+            },
+            timeout=5
         )
         return response.status_code == 201
-    except:
+    except Exception as e:
+        print(f"Error sending notification: {str(e)}")
         return False
 
 # Routes
@@ -137,7 +139,8 @@ def create_order(current_user_id):
     try:
         inventory_response = requests.post(
             f"{PRODUCT_SERVICE_URL}/api/inventory/check",
-            json={'items': items_to_check}
+            json={'items': items_to_check},
+            timeout=5
         )
         inventory_data = inventory_response.json()
         
@@ -145,7 +148,8 @@ def create_order(current_user_id):
         for item in inventory_data:
             if not item['available']:
                 return jsonify({'message': item['message']}), 400
-    except:
+    except Exception as e:
+        print(f"Error checking inventory: {str(e)}")
         return jsonify({'message': 'Error checking inventory'}), 500
     
     # Calculate total amount
@@ -195,11 +199,12 @@ def create_order(current_user_id):
             requests.post(
                 f"{PRODUCT_SERVICE_URL}/api/inventory/update",
                 headers={'Authorization': request.headers.get('Authorization')},
-                json={'items': [{'product_id': item['product_id'], 'quantity': item['quantity'], 'operation': 'decrease'} for item in data['items']]}
+                json={'items': [{'product_id': item['product_id'], 'quantity': item['quantity'], 'operation': 'decrease'} for item in data['items']]},
+                timeout=5
             )
-        except:
+        except Exception as e:
             # Log error, but don't fail the order
-            pass
+            print(f"Error updating inventory: {str(e)}")
         
         # Send notification
         send_notification(
@@ -228,7 +233,7 @@ def get_user_orders(current_user_id):
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
-    orders = Order.query.filter_by(user_id=current_user_id).order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    orders = Order.query.filter_by(user_id=current_user_id).order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page)
     
     result = {
         'items': [order.to_dict() for order in orders.items],
@@ -277,11 +282,12 @@ def cancel_order(current_user_id, order_id):
         requests.post(
             f"{PRODUCT_SERVICE_URL}/api/inventory/update",
             headers={'Authorization': request.headers.get('Authorization')},
-            json={'items': [{'product_id': item.product_id, 'quantity': item.quantity, 'operation': 'increase'} for item in order.items]}
+            json={'items': [{'product_id': item.product_id, 'quantity': item.quantity, 'operation': 'increase'} for item in order.items]},
+            timeout=5
         )
-    except:
+    except Exception as e:
         # Log error, but don't fail the cancellation
-        pass
+        print(f"Error restoring inventory: {str(e)}")
     
     db.session.commit()
     
@@ -312,7 +318,7 @@ def get_all_orders(current_user_id):
     if status:
         query = query.filter_by(status=status)
     
-    orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page)
     
     result = {
         'items': [order.to_dict() for order in orders.items],
