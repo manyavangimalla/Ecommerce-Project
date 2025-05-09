@@ -1,9 +1,8 @@
-ElectroCart - Microservices E-commerce Platform
+# ElectroCart - Microservices E-commerce Platform
 ElectroCart is a robust, microservices-based e-commerce application designed for scalability, security, and efficiency. This project implements a comprehensive architecture with distinct services for different aspects of an e-commerce platform.
 
-System Architecture
+# System Architecture
 ElectroCart consists of the following microservices:
-
 API Gateway: Routes client requests to appropriate microservices
 Frontend Application: Manages user interactions and presentation
 User Authentication Service: Handles user registration and authentication
