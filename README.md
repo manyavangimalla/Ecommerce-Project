@@ -257,14 +257,10 @@ gcloud container clusters create electrocart-cluster \
     --zone=us-central1-a \
     --machine-type=e2-medium
 5. Configure kubectl
-bash
 
-Copy
 gcloud container clusters get-credentials electrocart-cluster --zone=us-central1-a
 6. Deploy to Kubernetes
-bash
 
-Copy
 # Apply Kubernetes configuration
 kubectl apply -f all-services.yaml
 
