@@ -25,16 +25,6 @@ Git
 Local Development Setup
 Clone the Repository
 
-git clone https://github.com/yourusername/electrocart.git
-cd electrocart
-git checkout local_deployment
-Run with Docker Compose
-
-ElectroCart - Service Initialization Commands
-Below are the commands for installing dependencies and running each microservice in the ElectroCart system. These commands are useful for development, testing, and troubleshooting individual services.
-
-General Setup (Run once before starting any service)
-
 # Create a Python virtual environment (optional but recommended)
 python -m venv venv
 
@@ -269,10 +259,6 @@ kubectl get services
 
 # Get the external IP for your frontend service
 kubectl get service frontend-service
-
-# The application will be available at: http://<EXTERNAL-IP>
-Environment Variables
-Each service requires specific environment variables which are defined in the docker-compose-new.yml file for local development and in the Kubernetes ConfigMaps and Secrets for production deployment.
 
 Key environment variables include:
 Database connection strings
