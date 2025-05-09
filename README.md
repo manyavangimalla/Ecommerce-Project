@@ -199,8 +199,7 @@ Google Kubernetes Engine (GKE) Deployment
 gcloud auth login
 
 # Set your project
-gcloud config set project ecommerceproject-455902
-
+gcloud config set project Project-ID
 # Enable required APIs
 gcloud services enable container.googleapis.com
 gcloud services enable artifactregistry.googleapis.com
@@ -216,38 +215,38 @@ gcloud auth configure-docker us-central1-docker.pkg.dev
 3. Build and Push Docker Images
 # API Gateway
 cd api_gateway
-docker build -t us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/api-gateway:latest .
-docker push us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/api-gateway:latest
+docker build -t us-central1-docker.pkg.dev/Project-ID/electrocart-repo/api-gateway:latest .
+docker push us-central1-docker.pkg.dev/Project-ID/electrocart-repo/api-gateway:latest
 cd ..
 
 # Frontend
 cd frontend
-docker build -t us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/frontend:latest .
-docker push us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/frontend:latest
+docker build -t us-central1-docker.pkg.dev/Project-ID/electrocart-repo/frontend:latest .
+docker push us-central1-docker.pkg.dev/Project-ID/electrocart-repo/frontend:latest
 cd ..
 
 # User Service
 cd user_service
-docker build -t us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/user-service:latest .
-docker push us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/user-service:latest
+docker build -t us-central1-docker.pkg.dev/Project-ID/electrocart-repo/user-service:latest .
+docker push us-central1-docker.pkg.dev/Project-ID/electrocart-repo/user-service:latest
 cd ..
 
 # Product Service
 cd product_service
-docker build -t us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/product-service:latest .
-docker push us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/product-service:latest
+docker build -t us-central1-docker.pkg.dev/Project-ID/electrocart-repo/product-service:latest .
+docker push us-central1-docker.pkg.dev/Project-ID/electrocart-repo/product-service:latest
 cd ..
 
 # Order Service
 cd order_service
-docker build -t us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/order-service:latest .
-docker push us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/order-service:latest
+docker build -t us-central1-docker.pkg.dev/Project-ID/electrocart-repo/order-service:latest .
+docker push us-central1-docker.pkg.dev/Project-ID/electrocart-repo/order-service:latest
 cd ..
 
 # Notification Service
 cd notification_service
-docker build -t us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/notification-service:latest .
-docker push us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/notification-service:latest
+docker build -t us-central1-docker.pkg.dev/Project-ID/electrocart-repo/notification-service:latest .
+docker push us-central1-docker.pkg.dev/Project-ID/electrocart-repo/notification-service:latest
 cd ..
 4. Create GKE Cluster
 
@@ -288,7 +287,7 @@ kubectl logs deployment/api-gateway
 kubectl scale deployment/frontend --replicas=3
 
 # Update a deployment
-kubectl set image deployment/api-gateway api-gateway=us-central1-docker.pkg.dev/ecommerceproject-455902/electrocart-repo/api-gateway:v2
+kubectl set image deployment/api-gateway api-gateway=us-central1-docker.pkg.dev/Project-ID/electrocart-repo/api-gateway:v2
 Branching Strategy
 master: Production-ready code
 local_deployment: For local development and testing
