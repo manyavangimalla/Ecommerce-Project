@@ -249,15 +249,15 @@ gcloud container clusters create electrocart-cluster \
 gcloud container clusters get-credentials electrocart-cluster --zone=us-central1-a
 6. Deploy to Kubernetes
 
-# Apply Kubernetes configuration
+#Apply Kubernetes configuration
 kubectl apply -f all-services.yaml
 
-# Check deployment status
+#Check deployment status
 kubectl get pods
 kubectl get services
 7. Access the Application
 
-# Get the external IP for your frontend service
+#Get the external IP for your frontend service
 kubectl get service frontend-service
 
 Key environment variables include:
@@ -266,13 +266,13 @@ JWT secret keys
 Service URLs
 API keys for external services
 Monitoring and Maintenance
-# Check logs for a specific service
+#Check logs for a specific service
 kubectl logs deployment/api-gateway
 
-# Scale a deployment
+#Scale a deployment
 kubectl scale deployment/frontend --replicas=3
 
-# Update a deployment
+#Update a deployment
 kubectl set image deployment/api-gateway api-gateway=us-central1-docker.pkg.dev/Project-ID/electrocart-repo/api-gateway:v2
 Branching Strategy
 master: Production-ready code
