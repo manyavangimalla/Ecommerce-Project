@@ -291,3 +291,18 @@ Flask framework and its ecosystem
 Google Kubernetes Engine
 Docker and container orchestration technologies
 The open source community
+
+
+## Contributions
+
+- **Manya Shree**:  
+  Developed and enhanced both frontend and backend features. Implemented core frontend logic in `frontend/` and designed user-facing pages (product listing, product detail, cart, checkout, registration, and login). Contributed to the backend logic and API integration for the product and order services, ensuring seamless user experience and robust order workflows.
+
+- **Shubham Ghadge**:  
+  Managed the Kubernetes environment and Helm chart configurations (`ecommerce/`). Automated service orchestration and deployment pipelines, including writing and maintaining the `setup-application.sh` and `cloud/gcp.sh` scripts. Explored and integrated monitoring tools for service health, and authored comprehensive testing scripts for end-to-end validation.
+
+- **Sreeja**:  
+  Developed the user authentication (`user_auth_service/`) and notification (`notification_service/`) microservices, including their APIs, models, and integration logic. Assisted in deploying and testing services on Kubernetes, and ensured consistent document formatting and code quality across the project.
+
+- **Karthik Reddy Thippareddy**:  
+  Set up Dockerfiles for all services, developed the API Gateway (`api_gateway/`), and handled service integration and routing. Led the integration of microservices, ensuring smooth inter-service communication, and participated in final system testing and troubleshooting.
